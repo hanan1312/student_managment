@@ -1,0 +1,253 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink-950: #0b0d12;
+  --color-ink-900: #12141b;
+  --color-ink-800: #1a1d26;
+  --color-ink-700: #232733;
+  --color-ink-600: #2e3341;
+
+  --color-gold-300: #f3d98b;
+  --color-gold-400: #e8c15f;
+  --color-gold-500: #d4a94a;
+  --color-gold-600: #b8862f;
+
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe6fe;
+  --color-brand-500: #3f63e0;
+  --color-brand-600: #3151c4;
+  --color-brand-700: #2a44a3;
+  --color-brand-800: #22357d;
+  --color-brand-900: #1a2860;
+
+  --color-navy-950: #070f24;
+  --color-navy-900: #0e1c3f;
+  --color-navy-800: #16295a;
+  --color-navy-700: #1f3872;
+}
+
+:root[data-theme="emerald"] {
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-500: #129e74;
+  --color-brand-600: #0f8862;
+  --color-brand-700: #0c6f50;
+  --color-brand-800: #09563e;
+  --color-brand-900: #073f2d;
+}
+
+:root[data-theme="burgundy"] {
+  --color-brand-50: #fdf2f4;
+  --color-brand-100: #fbdfe4;
+  --color-brand-500: #a52f4c;
+  --color-brand-600: #8a2440;
+  --color-brand-700: #6f1c33;
+  --color-brand-800: #551527;
+  --color-brand-900: #3c0f1c;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-rise-in {
+  animation: rise-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(12px, -18px);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 9s ease-in-out infinite;
+}
+
+@keyframes float-slower {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-16px, 14px);
+  }
+}
+
+.animate-float-slower {
+  animation: float-slower 12s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease both;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-pan {
+  background-size: 200% 200%;
+  animation: gradient-pan 6s ease-in-out infinite;
+}
+
+@keyframes underline-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.animate-underline-in {
+  animation: underline-in 0.25s ease-out both;
+}
+
+::selection {
+  background: var(--color-brand-100);
+  color: var(--color-brand-700);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+  body.printing-only .print-area:not(.print-only-target) {
+    display: none !important;
+  }
+  /* Print previews are portaled to <body>; drop the app underneath so it adds no blank pages. */
+  body.printing-only #root {
+    display: none !important;
+  }
+  .certificate-page + .certificate-page {
+    break-before: page;
+  }
+  /* Students print preview: drop the modal chrome so the sheet flows over as many pages as it needs. */
+  .print-modal-root {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    background: none !important;
+    backdrop-filter: none !important;
+  }
+  .print-modal-root * {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    animation: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .print-sheet {
+    width: 100% !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-table tr {
+    break-inside: avoid;
+  }
+  .print-division-break + .print-division-break {
+    break-before: page;
+  }
+  .certificate-block,
+  .signature-block {
+    break-inside: avoid;
+  }
+}

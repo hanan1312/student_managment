@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.log
+
+# Secrets / local config
+.env
+!.env.example
+server/master-account.json
+
+# Local data
+*.db
+*.db-wal
+*.db-shm
+server/uploads/
