@@ -26,6 +26,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
+import { useSchools } from "../context/SchoolsContext";
 import { positionOptions } from "../context/ClassesContext";
 import { api, ApiError, assetUrl } from "../lib/api";
 import type { ClassStage, FeeType, Payment, Student, StudentInput } from "../lib/types";
@@ -469,6 +470,7 @@ type Props = {
 export default function StudentFormModal({ tree, initial, onClose, onSubmit }: Props) {
   const isEdit = Boolean(initial);
   const { settings } = useSettings();
+  const { schools } = useSchools();
 
   const [tab, setTab] = useState<TabKey>("basic");
   const [name, setName] = useState(initial?.name ?? "");
@@ -787,7 +789,18 @@ export default function StudentFormModal({ tree, initial, onClose, onSubmit }: P
                     />
                   </Field>
                   <Field label="المدرسة" span={2}>
-                    <input value={values.school} onChange={setField("school")} className={inputCls} />
+                    {/* Schools come from Students > إضافة مدرسة; an older free-text value stays selectable. */}
+                    <select value={values.school} onChange={setField("school")} className={inputCls}>
+                      <option value="">—</option>
+                      {values.school && !schools.some((s) => s.name === values.school) && (
+                        <option value={values.school}>{values.school}</option>
+                      )}
+                      {schools.map((s) => (
+                        <option key={s.id} value={s.name}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
                   </Field>
                 </Section>
               </div>

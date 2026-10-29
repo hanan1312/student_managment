@@ -19,6 +19,7 @@ import {
   GraduationCap,
   ShieldCheck,
   BookMarked,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useClasses, type ClassSelection } from "../context/ClassesContext";
@@ -47,6 +48,7 @@ import PaymentFormModal from "../components/PaymentFormModal";
 import StudentCertificateModal, { type CertificateStudent } from "../components/StudentCertificateModal";
 import CsvImportModal, { type ImportColumn } from "../components/CsvImportModal";
 import RibbonGroup from "../components/RibbonGroup";
+import SchoolFormModal from "../components/SchoolFormModal";
 
 type FlatClass = { id: number; className: string; stage: string; level: string };
 
@@ -141,6 +143,7 @@ export default function StudentsPage() {
   const navigate = useNavigate();
   const [degreesOpen, setDegreesOpen] = useState(false);
   const [subjectsOpen, setSubjectsOpen] = useState(false);
+  const [schoolsOpen, setSchoolsOpen] = useState(false);
   const { tree, selection, setSelection, selectedClassIds, selectedLevelIds, selectedClassId } = useClasses();
   const scopeName = selectionLabel(tree, selection);
 
@@ -381,6 +384,7 @@ export default function StudentsPage() {
             { label: "طباعة", icon: Printer, onClick: () => setPrintOpen(true) },
             { label: "المواد", icon: BookMarked, onClick: () => setSubjectsOpen(true) },
             { label: "ملف الدرجات", icon: GraduationCap, onClick: () => setDegreesOpen(true) },
+            { label: "إضافة مدرسة", icon: Building2, onClick: () => setSchoolsOpen(true) },
             ...(hasModule("control") ? [{ label: "المستخدمين", icon: ShieldCheck, onClick: () => navigate("/users") }] : []),
             ...(SHOW_EXTENDED_FEATURES
               ? [
@@ -469,6 +473,15 @@ export default function StudentsPage() {
       </div>
 
       {subjectsOpen && <SubjectSetupModal onClose={() => setSubjectsOpen(false)} />}
+      {schoolsOpen && (
+        <SchoolFormModal
+          onClose={() => {
+            setSchoolsOpen(false);
+            // A renamed school renames the students' المدرسة too.
+            loadStudents();
+          }}
+        />
+      )}
 
       {degreesOpen && (
         <DegreesProfileModal

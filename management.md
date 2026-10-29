@@ -15,7 +15,7 @@ and code are kept and can be switched back on with one setting (`SHOW_EXTENDED_F
 
 Visible today:
 
-- **شئون الطلاب → الطلاب**, with the ribbon buttons: طالب جديد، استيراد، تصدير، طباعة، المواد، ملف الدرجات، المستخدمين.
+- **شئون الطلاب → الطلاب**, with the ribbon buttons: طالب جديد، استيراد، تصدير، طباعة، المواد، ملف الدرجات، إضافة مدرسة، المستخدمين.
 - **الإعدادات** (Preferences), which holds the **العام الدراسي** used for students' age.
 - **المستخدمين** (Users), opened from the Students ribbon.
 
@@ -47,11 +47,27 @@ The whole interface is in **Arabic** and laid out **right-to-left**.
 |---|---|
 | التسكين | Where the student is placed in the Hierarchy (see §3) |
 | المرحلة / الصف | Filled in from التسكين; not typed |
-| المدرسة | Free text |
+| المدرسة | Chosen from the schools added in **إضافة مدرسة** (see below). An older typed-in value stays selectable |
 
 **Age rule:** age is shown in years, months and days on **1 October** of the first year of the
 academic year set in Preferences. For example, with "2026 / 2027" the age is worked out on
 1 October 2026.
+
+### Schools (إضافة مدرسة)
+
+Opened from **إضافة مدرسة** on the Students ribbon. It lists the schools and adds, edits or deletes them.
+
+| Field | Notes |
+|---|---|
+| اسم المدرسة | Required. This is the list offered in البيانات الأساسية → المدرسة. Renaming a school renames it on every student in it |
+| العنوان | |
+| المدينة | From المستخدمين → مدينة |
+| الإدارة | From المستخدمين → إدارة تعليمية |
+| رقم التليفون | |
+
+- A school that students are in can't be deleted, and the last school can't be deleted.
+- A city or education administration used by a school can't be deleted from المستخدمين.
+- These are the same schools the HR screens use.
 
 ### Students table
 
@@ -380,7 +396,8 @@ Clean-ups:
 | `server/src/routes/students.ts` | Position must be a leaf; `studentGrades`; `/degrees-overview`; saving grades with frozen marks; `degreeSummary` (totals and percentage, same rule as the client); stage scope checks |
 | `server/src/routes/subjects.ts` | Per-section `levelMarks` (كبرى/صغرى, `outsideTotal`). `elective_group` is preserved. Open to the `timetable` **or** `students` permission |
 | `server/src/routes/users.ts` | Generated code, username and password; edit with optional reset; `must_change_password` |
-| `server/src/routes/userCatalogs.ts` | Cities and education administrations CRUD |
+| `server/src/routes/userCatalogs.ts` | Cities and education administrations CRUD; reading is also open to the `students` permission |
+| `server/src/routes/schools.ts` | Schools (shared with HR); `city_id` / `education_admin_id` (`migrateSchoolsColumns`); renaming updates `students.school`. Open to `students` too |
 | `server/src/routes/auth.ts` | Lockout (5 tries, 5 minutes); first-login password change through `/auth/reset-password` |
 | `server/src/permissions.ts` | `requireModule(...)` accepts several modules (any one is enough); `getStageScope` (stages a user may manage, `null` = all) |
 | `server/src/routes/permissions.ts` | Modules and `stageIds` (`null` = every stage) per user |
@@ -389,7 +406,8 @@ Clean-ups:
 
 | File | Purpose |
 |---|---|
-| `client/src/components/StudentFormModal.tsx` | Core fields, التسكين, الديانة |
+| `client/src/components/StudentFormModal.tsx` | Core fields, التسكين, الديانة, المدرسة dropdown |
+| `client/src/components/SchoolFormModal.tsx` | إضافة مدرسة |
 | `client/src/components/StudentDegreesEditor.tsx` | Shared per-student degrees editor |
 | `client/src/components/DegreesProfileModal.tsx` | Degrees Profile screen |
 | `client/src/components/StudentCertificateModal.tsx` | Certificate print preview (horizontal table, options) |

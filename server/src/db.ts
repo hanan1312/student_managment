@@ -721,6 +721,15 @@ function migrateUsersColumns() {
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_code_unique ON users(code)");
 }
 
+// Students > إضافة مدرسة links a school to the Users catalogs (مدينة, إدارة تعليمية).
+function migrateSchoolsColumns() {
+  const cols = (db.prepare("PRAGMA table_info(schools)").all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes("city_id")) db.exec("ALTER TABLE schools ADD COLUMN city_id INTEGER REFERENCES cities(id)");
+  if (!cols.includes("education_admin_id")) {
+    db.exec("ALTER TABLE schools ADD COLUMN education_admin_id INTEGER REFERENCES education_admins(id)");
+  }
+}
+
 // levels.parent_id lets a level hold sub-levels (e.g. الصف الثاني الثانوي > البكالوريا المصرية >
 // الطب وعلوم الحياة). Every level keeps its stage_id; only leaves are a student's Position.
 function migrateLevelsColumns() {
@@ -1155,6 +1164,7 @@ migrateHrOrgDivisionColumns();
 migrateSubjectsColumns();
 migrateUsersColumns();
 migrateLevelsColumns();
+migrateSchoolsColumns();
 
 seedClasses();
 migrateClassHierarchy();

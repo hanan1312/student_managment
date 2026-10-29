@@ -504,6 +504,10 @@ export type School = {
   governorate: string | null;
   directorate: string | null;
   logo_url: string | null;
+  city_id: number | null;
+  education_admin_id: number | null;
+  city_name: string | null;
+  education_admin_name: string | null;
 };
 
 export type SchoolInput = {
@@ -512,6 +516,8 @@ export type SchoolInput = {
   phone?: string;
   governorate?: string;
   directorate?: string;
+  cityId?: number | null;
+  educationAdminId?: number | null;
 };
 
 export type HrEmployee = {
