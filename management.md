@@ -267,7 +267,7 @@ Both use the same form:
 |---|---|
 | مدينة, إدارة تعليمية | Dropdowns from the two tabs above |
 | الكود | Random, unique, 5 digits (can be regenerated) |
-| اسم المستخدم | Generated as `مدينة_إدارة تعليمية_الكود` |
+| اسم المستخدم | Generated as `الاسم الأول_مدينة_الكود`; the first name is the first word of الاسم بالكامل, so the username changes when the name, city or code changes |
 | كلمة المرور المؤقتة | Generated as `الدور_الكود` (e.g. `teacher_48213`), shown once after saving |
 
 - **Edit** can reset the password back to the temporary one.

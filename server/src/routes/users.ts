@@ -24,6 +24,11 @@ function isCodeTaken(code: string) {
   return Boolean(db.prepare("SELECT 1 FROM users WHERE code = ?").get(code));
 }
 
+// Generated username: "<first name>_<city>_<code>", the first name being the first word of the full name.
+function generatedUsername(fullName: string, cityName: string, code: string) {
+  return `${fullName.trim().split(/\s+/)[0]}_${cityName.trim()}_${code}`;
+}
+
 // A random 5-digit code no user has yet.
 function generateUniqueCode(): string {
   for (let i = 0; i < 1000; i++) {
@@ -54,7 +59,7 @@ usersRouter.post("/", requireAuth, (req: AuthedRequest, res) => {
   }
 
   // New User form: city + education administration given, so the username is
-  // "<city>_<education admin>_<code>" and the temporary password "<role>_<code>". That
+  // "<first name>_<city>_<code>" and the temporary password "<role>_<code>". That
   // password skips the strength rule — it only works once, since the user must replace it
   // on first sign-in. Without them (CSV import), username/password come from the request.
   let username: string;
@@ -71,8 +76,10 @@ usersRouter.post("/", requireAuth, (req: AuthedRequest, res) => {
       | undefined;
     if (!city || !eduAdmin) return res.status(400).json({ error: "Choose both a city and an education administration" });
 
-    code = typeof b.code === "string" && /^\d{5}$/.test(b.code) && !isCodeTaken(b.code) ? b.code : generateUniqueCode();
-    username = `${city.name.trim()}_${eduAdmin.name.trim()}_${code}`;
+    const newCode: string =
+      typeof b.code === "string" && /^\d{5}$/.test(b.code) && !isCodeTaken(b.code) ? b.code : generateUniqueCode();
+    code = newCode;
+    username = generatedUsername(b.fullName, city.name, newCode);
     password = `${requestedRole}_${code}`;
     cityId = city.id;
     educationAdminId = eduAdmin.id;
@@ -121,7 +128,7 @@ usersRouter.put("/:id", requireAuth, (req: AuthedRequest, res) => {
     return res.status(403).json({ error: "Only an admin can grant the admin role" });
   }
 
-  // Same fields as New User: city + education administration + code rebuild the username,
+  // Same fields as New User: full name + city + code rebuild the username,
   // and resetPassword puts the password back to the temporary "<role>_<code>".
   let username: string = existing.username;
   let code: string | null = existing.code;
@@ -144,7 +151,7 @@ usersRouter.put("/:id", requireAuth, (req: AuthedRequest, res) => {
     code = requestedCode;
     cityId = city.id;
     educationAdminId = eduAdmin.id;
-    username = `${city.name.trim()}_${eduAdmin.name.trim()}_${code}`;
+    username = generatedUsername(b.fullName || existing.full_name, city.name, requestedCode);
     if (username === masterAccount.username) {
       return res.status(409).json({ error: "That username is reserved for the master account" });
     }

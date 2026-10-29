@@ -29,7 +29,7 @@ type Props = {
 const fieldCls =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-100 hover:border-slate-300 disabled:bg-slate-50 disabled:text-slate-500";
 
-// New and Edit share the same fields. Username ("<city>_<education admin>_<code>") and the
+// New and Edit share the same fields. Username ("<first name>_<city>_<code>") and the
 // temporary password ("<role>_<code>") are derived, shown read-only so the admin knows what to
 // hand over; the server (routes/users.ts) makes the final call.
 export default function SystemUserModal({ initial, onClose, onSubmit }: Props) {
@@ -65,8 +65,8 @@ export default function SystemUserModal({ initial, onClose, onSubmit }: Props) {
   }, [token]);
 
   const cityName = cities.find((c) => c.id === cityId)?.name.trim();
-  const eduAdminName = eduAdmins.find((c) => c.id === eduAdminId)?.name.trim();
-  const generatedUsername = cityName && eduAdminName && code ? `${cityName}_${eduAdminName}_${code}` : "";
+  const firstName = fullName.trim().split(/\s+/)[0];
+  const generatedUsername = firstName && cityName && code ? `${firstName}_${cityName}_${code}` : "";
   const generatedPassword = code ? `${role}_${code}` : "";
   // An older user with neither picked keeps their existing username.
   const keepsLegacyUsername = isEdit && cityId === "" && eduAdminId === "";
@@ -176,7 +176,7 @@ export default function SystemUserModal({ initial, onClose, onSubmit }: Props) {
             <input
               value={keepsLegacyUsername ? initial?.username ?? "" : generatedUsername}
               disabled
-              placeholder="مدينة_إدارة تعليمية_code"
+              placeholder="الاسم الأول_مدينة_الكود"
               className={fieldCls}
             />
             {keepsLegacyUsername && (
