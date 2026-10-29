@@ -29,6 +29,9 @@ type ClassesContextValue = {
   deleteStage: (stageId: number) => Promise<void>;
   renameLevel: (levelId: number, name: string) => Promise<void>;
   deleteLevel: (levelId: number) => Promise<void>;
+  moveStage: (stageId: number, beforeId: number | null) => Promise<void>;
+  // parentId null: directly under the stage; beforeId null: last among the new siblings.
+  moveLevel: (levelId: number, stageId: number, parentId: number | null, beforeId: number | null) => Promise<void>;
   renameClass: (classId: number, name: string) => Promise<void>;
   deleteClass: (classId: number) => Promise<void>;
 };
@@ -148,6 +151,27 @@ export function ClassesProvider({ children }: { children: ReactNode }) {
     setSelection({ type: "all" });
   };
 
+  const moveStage = async (stageId: number, beforeId: number | null) => {
+    if (!token) return;
+    const res = await api.moveStage(token, stageId, beforeId);
+    setTree(res.tree);
+  };
+
+  const moveLevel = async (levelId: number, stageId: number, parentId: number | null, beforeId: number | null) => {
+    if (!token) return;
+    const res = await api.moveLevel(token, levelId, stageId, parentId, beforeId);
+    setTree(res.tree);
+    // The selected level's path (and maybe stage) can change with the move; refresh its labels.
+    setSelection((current) => {
+      if (current.type !== "level") return current;
+      for (const stage of res.tree as ClassStage[]) {
+        const level = stage.levels.find((l) => l.id === current.levelId);
+        if (level) return { type: "level", stage: stage.stage, level: level.path, levelId: level.id };
+      }
+      return { type: "all" };
+    });
+  };
+
   const renameClass = async (classId: number, name: string) => {
     if (!token) return;
     const res = await api.renameClass(token, classId, name);
@@ -179,6 +203,8 @@ export function ClassesProvider({ children }: { children: ReactNode }) {
       deleteStage,
       renameLevel,
       deleteLevel,
+      moveStage,
+      moveLevel,
       renameClass,
       deleteClass,
     }),

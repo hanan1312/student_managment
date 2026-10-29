@@ -257,6 +257,79 @@ classesRouter.delete("/levels/:levelId", requireAuth, (req, res) => {
   res.json(buildTreeResponse(req));
 });
 
+// Drag-to-reorder in the tree: a stage is placed before beforeId (or last when beforeId is null).
+classesRouter.put("/stages/:stageId/position", requireAuth, (req, res) => {
+  const stageId = Number(req.params.stageId);
+  const beforeId = req.body?.beforeId ? Number(req.body.beforeId) : null;
+  // Stage order is shared by everyone, so only users who manage every stage can change it.
+  if (getStageScope((req as AuthedRequest).user)) return res.status(403).json({ error: OUT_OF_SCOPE_ERROR });
+  if (!db.prepare("SELECT id FROM stages WHERE id = ?").get(stageId)) return res.status(404).json({ error: "Stage not found" });
+
+  const ids = (db.prepare("SELECT id FROM stages WHERE id != ? ORDER BY sort_order").all(stageId) as { id: number }[]).map(
+    (r) => r.id
+  );
+  const at = beforeId === null ? -1 : ids.indexOf(beforeId);
+  ids.splice(at === -1 ? ids.length : at, 0, stageId);
+  const update = db.prepare("UPDATE stages SET sort_order = ? WHERE id = ?");
+  db.transaction(() => ids.forEach((id, i) => update.run(i, id)))();
+
+  res.json(buildTreeResponse(req));
+});
+
+// Moves a level (with everything under it) to parentId in stageId (null: directly under the
+// stage), before beforeId among its new siblings (or last when beforeId is null).
+classesRouter.put("/levels/:levelId/position", requireAuth, (req, res) => {
+  const levelId = Number(req.params.levelId);
+  const stageId = Number(req.body?.stageId);
+  const parentId = req.body?.parentId ? Number(req.body.parentId) : null;
+  const beforeId = req.body?.beforeId ? Number(req.body.beforeId) : null;
+  if (!levelAllowed(req, levelId) || !stageAllowed(req, stageId)) {
+    return res.status(403).json({ error: OUT_OF_SCOPE_ERROR });
+  }
+
+  const level = db.prepare("SELECT id, stage_id FROM levels WHERE id = ?").get(levelId) as
+    | { id: number; stage_id: number }
+    | undefined;
+  if (!level) return res.status(404).json({ error: "Level not found" });
+  if (!db.prepare("SELECT id FROM stages WHERE id = ?").get(stageId)) return res.status(404).json({ error: "Stage not found" });
+
+  const ids = descendantLevelIds(levelId);
+  if (parentId !== null) {
+    if (ids.includes(parentId)) return res.status(400).json({ error: "لا يمكن نقل العنصر داخل نفسه" });
+    const parent = db.prepare("SELECT id FROM levels WHERE id = ? AND stage_id = ?").get(parentId, stageId);
+    if (!parent) return res.status(404).json({ error: "Parent level not found" });
+    if (db.prepare("SELECT 1 FROM students WHERE level_id = ?").get(parentId)) {
+      return res.status(400).json({ error: "يوجد طلاب مسكنون على هذا العنصر؛ انقلهم أولاً قبل إضافة فروع داخله" });
+    }
+  }
+
+  const siblings = (
+    db
+      .prepare("SELECT id FROM levels WHERE stage_id = ? AND parent_id IS ? AND id != ? ORDER BY sort_order")
+      .all(stageId, parentId, levelId) as { id: number }[]
+  ).map((r) => r.id);
+  const at = beforeId === null ? -1 : siblings.indexOf(beforeId);
+  siblings.splice(at === -1 ? siblings.length : at, 0, levelId);
+
+  const marks = ids.map(() => "?").join(",");
+  const tx = db.transaction(() => {
+    db.prepare("UPDATE levels SET parent_id = ? WHERE id = ?").run(parentId, levelId);
+    const update = db.prepare("UPDATE levels SET sort_order = ? WHERE id = ?");
+    siblings.forEach((id, i) => update.run(i, id));
+    if (level.stage_id !== stageId) {
+      db.prepare(`UPDATE levels SET stage_id = ? WHERE id IN (${marks})`).run(stageId, ...ids);
+      db.prepare(
+        `UPDATE classes SET stage_label = (SELECT name FROM stages WHERE id = ?) WHERE level_id IN (${marks})`
+      ).run(stageId, ...ids);
+    }
+    // The moved branch's paths changed, so its students' المرحلة / الصف text did too.
+    syncStudentPositionText();
+  });
+  tx();
+
+  res.json(buildTreeResponse(req));
+});
+
 classesRouter.put("/:id", requireAuth, (req, res) => {
   const id = Number(req.params.id);
   const name = (req.body?.name ?? "").trim();

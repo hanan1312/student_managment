@@ -1,0 +1,410 @@
+# Students, Degrees & Users — Work Summary
+
+This document covers what was built in this round of work on the school app: what changed for
+users, how the main rules work, what changed in the data, and what is still open. The last
+section is a technical reference for developers.
+
+---
+
+## 1. What the app shows now
+
+The app was trimmed to the features in active use. Everything else (Finance, Time Table, Buses,
+Inventory, HR & Staff, and the extra student tabs and fields) is **hidden, not deleted**. Its data
+and code are kept and can be switched back on with one setting (`SHOW_EXTENDED_FEATURES` in
+`client/src/lib/features.ts`).
+
+Visible today:
+
+- **شئون الطلاب → الطلاب**, with the ribbon buttons: طالب جديد، استيراد، تصدير، طباعة، المواد، ملف الدرجات، المستخدمين.
+- **الإعدادات** (Preferences), which holds the **العام الدراسي** used for students' age.
+- **المستخدمين** (Users), opened from the Students ribbon.
+
+The whole interface is in **Arabic** and laid out **right-to-left**.
+
+---
+
+## 2. Students
+
+### Student record (طالب جديد / تعديل)
+
+**البيانات الأساسية**
+
+| Field | Notes |
+|---|---|
+| الاسم | Required |
+| النوع | ذكر / أنثى |
+| الديانة | مسلم / مسيحي |
+| نوع القيد | مستجد / غير مستجد |
+| الجنسية | Free text, with suggestions (مصري، سوداني، …). Also a table column, in Import and Export |
+| الرقم القومي | |
+| كود الحكومة الالكترونية | Was "كود الوزارة". Import still accepts files with the old header |
+| تاريخ الميلاد | |
+| السن في ١ أكتوبر | Calculated automatically (see below) |
+
+**بيانات القبول**
+
+| Field | Notes |
+|---|---|
+| التسكين | Where the student is placed in the Hierarchy (see §3) |
+| المرحلة / الصف | Filled in from التسكين; not typed |
+| المدرسة | Free text |
+
+**Age rule:** age is shown in years, months and days on **1 October** of the first year of the
+academic year set in Preferences. For example, with "2026 / 2027" the age is worked out on
+1 October 2026.
+
+### Students table
+
+- Columns can be shown or hidden with **الأعمدة**. Only fields that are currently enabled in the
+  app are offered.
+- New columns:
+  - **مجموع الدرجات** shows the total of the student's degrees.
+  - **النسبة المئوية** shows the percentage (see §5).
+  - **المدرسة** and **الديانة** can be turned on from the column picker.
+- **الإجراءات:** the print icon on a row opens that student's degrees certificate (see §5). It
+  replaces the old بنود المصروفات button.
+- **Pages:** the table shows **50 students per page**, with السابق / التالي and page numbers
+  under the table. A group (المرحلة / الصف) split over two pages shows e.g. "(12 من 40)".
+  - A new search or tree selection, or a column filter, goes back to page 1. Editing a student
+    keeps the current page.
+  - The select-all checkbox selects the **current page only**, so حذف المحدد never deletes rows
+    that aren't on screen.
+
+### Import / Export
+
+- Both use the visible fields, with Arabic column headers.
+- Older files with English headers still import.
+- Gender and religion accept Arabic or English values (e.g. ذكر/M, مسلم/Muslim).
+- The section column can hold either the full Hierarchy path or just the section name, if that
+  name is unique.
+
+### Print (طباعة)
+
+**طباعة** opens a print preview of the students currently listed (the tree selection and
+search apply, as for Export).
+
+- **Header** on the printed sheet: school name, العام الدراسي, the sheet title, the school logo
+  (from Preferences), **تاريخ الطباعة** (date and time) and the number of students.
+- **المراحل:** a checkbox per division chooses which divisions are printed. Each division is
+  printed as its own table, with its sections as heading rows.
+- **Adjusting the table before printing:**
+  - Edit the sheet title.
+  - Choose the columns (starts from the table's current columns), hide one with ×, and move it
+    right / left with the arrows in its header.
+  - طولي / عرضي (portrait / landscape), font size, section heading rows on/off, and
+    "كل مرحلة في صفحة جديدة" (each division on a new page).
+  - Remove single rows from the printout with the × at the end of the row (hover). They can
+    be brought back with "استعادة الصفوف المحذوفة". This only affects the printout.
+- The table header repeats on every printed page. Row numbers (م) restart for each division.
+
+---
+
+## 3. Hierarchy (الهيكل → المراحل)
+
+- **Classes removed:** the tree no longer uses classes. A student is placed on a **section**, not a class.
+- **Nesting:** the tree can now nest to any depth. The **+** on any row adds a sub-item inside it.
+- **Placement:** students can only be placed on the **last item of a branch**, never on an item
+  that has sub-items.
+- **Filtering:** clicking any item in the tree shows all students under it.
+- **Renaming** an item updates the المرحلة / الصف text of every student under it.
+- **Deleting** an item deletes everything inside it. Its students are kept, but without a placement.
+- **Rearranging (optional):** the **⇅** button in the الهيكل header turns on drag mode (press it again
+  to turn it off). While it is on, every row shows a grip and can be dragged:
+  - A **stage** dropped on the top or bottom half of another stage goes before or after it.
+  - A **level** dropped on the top or bottom edge of another level goes before or after it. Dropped on
+    the middle of a level, it moves inside it. Dropped on a stage, it moves to the end of that stage.
+  - A level moves with everything inside it, including to another stage. The المرحلة / الصف text of
+    its students is updated.
+  - A level can't be moved inside itself, or inside a level that has students placed on it.
+  - Only users who manage every stage can reorder stages.
+
+### المرحلة الثانوية
+
+Built from the Ministry charts (* = where students can be placed):
+
+```
+المرحلة الثانوية
+├ الصف الأول الثانوي *
+├ الصف الثاني الثانوي
+│  ├ البكالوريا المصرية → الطب وعلوم الحياة* · الهندسة وعلوم الحاسب* · الأعمال* · الآداب والفنون*
+│  └ الثانوية العامة (نظام جديد) → شعبة علمي* · شعبة أدبي*
+└ الصف الثالث الثانوي
+   ├ البكالوريا المصرية → الطب* · الهندسة* · الأعمال* · الآداب والفنون*
+   └ الثانوية العامة (نظام جديد) → شعبة علمي* · شعبة الرياضيات* · شعبة أدبي*
+```
+
+- Each track's subjects from the charts were created and linked to it.
+- الصف الأول الثانوي is not in the charts, so it was added without tracks.
+- The tree was added once. Later edits to it are kept and not overwritten.
+
+---
+
+## 4. Subjects (المواد)
+
+Subjects are managed in **المواد** on the Students ribbon. Each subject is linked to the sections
+that study it, and **each section has its own settings**:
+
+- **النهاية الكبرى / النهاية الصغرى** (full marks / pass mark). These differ by grade year, so
+  they are set per section.
+  - Typing a صغرى fills in كبرى as double it. كبرى can still be typed by hand.
+  - A **"نفس القيم لكل المحدد"** row copies one pair of marks to every ticked section.
+- **Choosing sections:** the list is grouped by stage. Each stage, and each level that has
+  sub-levels, has its own checkbox: ticking it selects every section under it (ticking again clears
+  them), and it shows how many are ticked (e.g. `3/6`).
+- Pressing **edit** on a subject scrolls back up to the form, with the section list scrolled to the
+  subject's first section.
+- **خارج المجموع** (outside the total): the degree is entered and printed, but left out of
+  مجموع الدرجات and the percentage.
+  - It is set per section. For example, اللغة الأجنبية الثانية is خارج المجموع in الثانوية العامة,
+    but is a specialised subject in بكالوريا الآداب.
+- **اختياري** (choose one): in الصف الثاني بكالوريا the specialised pairs, such as
+  الرياضيات أو الفيزياء, are choose-one. Totals count only the subject the student has a degree in.
+
+The marks can only be changed in المواد. They are read-only on the student's record.
+
+---
+
+## 5. Degrees (الدرجات)
+
+### Per student
+
+On the student's **ملف الدرجات** tab, or by clicking a student's row in the Degrees Profile screen:
+
+- Each subject shows the section's **النهايات** (كبرى / صغرى, read-only) and **one degree** box
+  (الدرجة), out of the كبرى mark. (The earlier separate صغرى degree is no longer entered or shown.)
+- A degree higher than the كبرى mark is shown in red and is refused on save.
+- Totals: **مجموع الدرجات**, **النسبة المئوية** and **الحالة**.
+- **طباعة الشهادة** opens the certificate print preview (see below).
+
+### Percentage
+
+```
+النسبة المئوية = (مجموع الدرجات ÷ مجموع النهايات الكبرى) × 100
+```
+
+- Both sums leave out subjects that are **خارج المجموع**. In a choose-one (اختياري) pair only one
+  subject's mark counts.
+- The denominator is the كبرى marks of **all** the student's subjects in the total, including ones
+  with no degree yet, so a student with missing degrees shows a lower percentage.
+- It is rounded to one decimal, and is empty until at least one degree is entered.
+
+### الحالة
+
+| النسبة المئوية | الحالة |
+|---|---|
+| 50% or more | **ناجح و منقول للصف التالي** (green) |
+| below 50% | **راسب** (red) |
+| no degree yet | (empty) |
+
+الحالة is a column in the Students table (filter it from the column header), in Export and in
+the Students print, and is shown in ملف الدرجات and on certificates.
+
+### Marks are frozen on saved degrees
+
+When a degree is saved, the section's marks at that moment are stored with it. Changing a
+section's marks later does **not** change degrees already saved, or their printed certificates.
+Changing the degree itself picks up the section's current marks.
+
+### Degrees Profile screen (ملف الدرجات on the ribbon)
+
+- One table of all students, with name, الرقم القومي, كود الحكومة الالكترونية, المرحلة and الصف.
+- Each subject has **one column**: the student's degree. Under the subject's name: its marks as
+  **صغرى / كبرى** (e.g. `50 / 100`), when they are the same for every section shown.
+- **Column order:** subjects in the total, then **مجموع الدرجات**, then subjects **خارج المجموع**,
+  then **%** and **الحالة**. Under مجموع الدرجات: the total marks as صغرى / كبرى (e.g. `240 / 480`),
+  when they are the same for every student shown.
+- A subject marked خارج المجموع in a section is not added to مجموع الدرجات or the percentage.
+- **Filters:**
+  - **المراحل:** a whole stage, or any item in the tree with everything under it. Only the subjects
+    of the chosen part are shown.
+  - **الحالة:** ناجح، راسب، or بدون درجات.
+  - **Search** by name, national ID, كود الحكومة الالكترونية, division, section or school.
+- **Click a row** to edit that student's degrees.
+- **Printing:**
+  - **طباعة الكل** prints the table rows currently shown (all filters apply). The preview works like
+    the Students print: title, columns (student data, each subject, totals) that can be hidden or
+    moved, portrait/landscape, font size, and removing single rows.
+  - **Checkboxes** select students. **طباعة الشهادات (n)** prints a certificate for each ticked
+    student in the current view. The print icon on a row prints that student's certificate.
+
+### Certificate (شهادة درجات)
+
+- Header with the school logo, school name, academic year and the date of printing, then the
+  student's name, الرقم القومي, كود الحكومة الالكترونية, المرحلة and الصف.
+- **Horizontal table:** one column per subject, with **المجموع** after the subjects in the total
+  and before the subjects خارج المجموع (which are marked). Rows: النهاية الكبرى, النهاية الصغرى,
+  الدرجة.
+- Under it: النسبة المئوية and الحالة (green / red).
+- **Preview options:** title; which of the selected students to print; show or hide the
+  النهاية الكبرى / الصغرى rows, percentage, status and print date; signatures; portrait/landscape;
+  font size; one certificate per page or one after another.
+
+### Signatures (all print previews)
+
+The Students print, the ملف الدرجات table print and the certificate all have a **التوقيعات**
+section. The captions (default **شئون الطلاب** and **مدير المدرسة**) can be edited, removed, or
+added to (up to 4). They are remembered in this browser for the next printout; **الافتراضي** puts
+the two defaults back. Signatures are on by default for certificates and off for the two tables.
+
+---
+
+## 6. Users (المستخدمين)
+
+### Sub-tabs
+
+| Tab | Contents |
+|---|---|
+| المستخدمين | Users list |
+| النشاط | Activity |
+| **مدينة** | Cities: postal code, name, comment |
+| **إدارة تعليمية** | Education administrations: code, name, comment |
+
+### New user / Edit user
+
+Both use the same form:
+
+| Field | How it's set |
+|---|---|
+| مدينة, إدارة تعليمية | Dropdowns from the two tabs above |
+| الكود | Random, unique, 5 digits (can be regenerated) |
+| اسم المستخدم | Generated as `مدينة_إدارة تعليمية_الكود` |
+| كلمة المرور المؤقتة | Generated as `الدور_الكود` (e.g. `teacher_48213`), shown once after saving |
+
+- **Edit** can reset the password back to the temporary one.
+
+### إدارة الصلاحيات
+
+Opened with the lock icon on a user's row (admins and the master account only).
+
+- **Modules:** only the parts the app currently shows are offered: **الطلاب** (students, import,
+  export, print, subjects, degrees), **المستخدمين** and **الإعدادات**. Grants for hidden modules are
+  kept as they are, so turning the extended features back on loses nothing.
+- **المراحل:** **كل المراحل** (the default), or tick the stages the user manages. A user limited to
+  some stages:
+  - sees only those stages in the tree and only their students, in the table, Degrees Profile,
+    Print and Export;
+  - can add, edit, delete and grade only students placed in those stages, and can't move a
+    student out of them. Students with no placement are outside their stages;
+  - can't add a new stage or edit another stage's part of the tree;
+  - in المواد, sees and edits only their stages' sections of a subject. They can't rename or
+    delete a subject that other stages also use.
+- Admins always have every module and every stage.
+- **First sign-in:** a new user, or one whose password was reset, must choose their own password
+  before getting in. These users are marked "في انتظار أول دخول" in the list.
+
+### Sign-in rules
+
+- Signing in happens on a dedicated page. Logging out returns there, and reloading the page does
+  not sign you back in.
+- **Lockout:** after **5 wrong passwords in a row** for the same username, that username is
+  locked for **5 minutes**. During the lock even the correct password is refused.
+- The page warns how many attempts are left, shows a countdown while locked, warns when
+  Caps Lock is on, can show or hide the password, and has **تذكرني** (remembers the username only).
+- The top-right menu shows the user's name, username and role, with تغيير كلمة المرور and تسجيل الخروج.
+
+---
+
+## 7. Data changes
+
+All changes are additive and run automatically when the server starts. No existing data was removed,
+except the two clean-ups noted at the end of this section.
+
+| Area | Change |
+|---|---|
+| Students | New: المدرسة, التسكين (section link, filled in from each student's old class), الديانة uses the existing field |
+| Hierarchy | Sections can nest. المرحلة الثانوية tree added once |
+| Subjects | كبرى/صغرى, خارج المجموع and اختياري are stored per section. The old subject-wide marks were copied to each of the subject's sections |
+| Degrees | New per-student degrees table: كبرى degree, صغرى degree, and the frozen marks |
+| Users | New: code, city, education administration, "must change password". New cities and education-administrations tables. New sign-in lockout table |
+| Users — stages | New `users.stages_restricted` flag and `user_stages` table (the stages a limited user manages) |
+| Students — نوع القيد | New `students.enrollment_type` (مستجد / غير مستجد) |
+| Students — الجنسية | Uses the existing `students.nationality` column |
+| Degrees | One degree per subject (`student_grades.score`). `score_min` is kept in the table but no longer entered; it is cleared when a student's degrees are saved again |
+
+Clean-ups:
+
+- Per-student mark overrides from an intermediate version, on rows with no degree, were removed.
+- Saved table-column choices were reset once, so the new default columns show.
+
+---
+
+## 8. Open items and decisions
+
+1. **70% pass mark** for التربية الدينية: the charts set its pass mark at 70%, but the
+   كبرى = صغرى × 2 rule assumes 50%. A per-subject pass-percentage setting would solve this.
+2. **Duplicate subjects:** the older English-named subjects ("Arabic", "math") are separate from
+   the new "اللغة العربية" and "الرياضيات". Decide whether to merge or rename them.
+3. **Choose-one groups** can't yet be created or edited in the screens. Only the seeded
+   بكالوريا pairs exist.
+4. **Server messages** (e.g. "Username already taken") are still in English.
+5. **Missing gender on import** is still saved as غير محدد. Decide whether to default it or
+   reject the row.
+6. **Lockout is per username**, so anyone who knows a username can lock it for 5 minutes,
+   including the master account.
+7. **Not built yet** from the Users spec: role management screen, password policy screen,
+   email (SMTP), account-recovery requests, demo accounts.
+8. **Master account** still uses its default password (`change-me` in
+   `server/master-account.json`). Change it before going live.
+
+---
+
+## 9. How it was checked
+
+- The server rules were tested end to end against **copies** of the real database, never the live
+  one. This covered:
+  - Placement, the Hierarchy tree and the secondary seed.
+  - Marks per section, خارج المجموع, choose-one, and frozen marks.
+  - Degrees, totals and percentage.
+  - Users: generated credentials, first sign-in, and lockout on the 6th attempt with the correct
+    password.
+- The main screens were checked in a headless browser:
+  - Sign-in, Students, the student form, Degrees Profile and its editor, Users.
+  - The Hierarchy tree and Subject Setup.
+- The client typechecks and builds cleanly.
+
+---
+
+## 10. Technical reference (for developers)
+
+**Feature switch:** `client/src/lib/features.ts`
+
+- `SHOW_EXTENDED_FEATURES` hides or shows everything outside the core.
+- `CORE_MODULE_KEYS` lists the module tabs kept visible.
+
+**Server**
+
+| File | Purpose |
+|---|---|
+| `server/src/db.ts` | Migrations: `migrateSubjectsColumns`, `migrateUsersColumns`, `migrateLevelsColumns`; `seedSecondaryTree` (runs once, guarded by the settings flag `seeded_secondary_tree_v1`) |
+| `server/src/routes/classes.ts` | Nested tree response (flat list with `parent_id`, `depth`, `path`, `is_leaf`); `syncStudentPositionText`; deleting a branch; drag moves (`PUT /stages/:id/position`, `PUT /levels/:id/position`) |
+| `server/src/routes/students.ts` | Position must be a leaf; `studentGrades`; `/degrees-overview`; saving grades with frozen marks; `degreeSummary` (totals and percentage, same rule as the client); stage scope checks |
+| `server/src/routes/subjects.ts` | Per-section `levelMarks` (كبرى/صغرى, `outsideTotal`). `elective_group` is preserved. Open to the `timetable` **or** `students` permission |
+| `server/src/routes/users.ts` | Generated code, username and password; edit with optional reset; `must_change_password` |
+| `server/src/routes/userCatalogs.ts` | Cities and education administrations CRUD |
+| `server/src/routes/auth.ts` | Lockout (5 tries, 5 minutes); first-login password change through `/auth/reset-password` |
+| `server/src/permissions.ts` | `requireModule(...)` accepts several modules (any one is enough); `getStageScope` (stages a user may manage, `null` = all) |
+| `server/src/routes/permissions.ts` | Modules and `stageIds` (`null` = every stage) per user |
+
+**Client**
+
+| File | Purpose |
+|---|---|
+| `client/src/components/StudentFormModal.tsx` | Core fields, التسكين, الديانة |
+| `client/src/components/StudentDegreesEditor.tsx` | Shared per-student degrees editor |
+| `client/src/components/DegreesProfileModal.tsx` | Degrees Profile screen |
+| `client/src/components/StudentCertificateModal.tsx` | Certificate print preview (horizontal table, options) |
+| `client/src/components/StudentsTable.tsx` | Students table; 50-per-page paging (`PAGE_SIZE`), reset by the page's `pageResetKey` |
+| `client/src/components/StudentsPrintModal.tsx` | Students print preview (divisions, columns, layout); print CSS in `index.css` (`.print-modal-root`, `.print-sheet`) |
+| `client/src/lib/degrees.ts` | `degreeTotals` (outside-total and choose-one rules, percentage), `passStatus` (ناجح / راسب), `autoMaxFromMin` (×2 rule for marks), print helper |
+| `client/src/components/PrintParts.tsx` | Shared print-preview pieces (modal, logo/date header, layout options, column and row controls) used by the Students print, the Degrees table print and certificates |
+| `client/src/components/DegreesTablePrintModal.tsx` | ملف الدرجات → طباعة الكل |
+| `client/src/lib/studentAge.ts` | Age on 1 October |
+| `client/src/components/ClassTree.tsx` | Nested tree; drag mode (`ArrangeContext`, `useArrangeRow`) |
+| `client/src/context/ClassesContext.tsx` | Selection by `levelId`, `levelAndDescendants`, `positionOptions` |
+| `client/src/components/timetable/SubjectSetupModal.tsx` | Per-section marks, خارج, اختياري badge |
+| `client/src/pages/UsersPage.tsx`, `SystemUserModal.tsx`, `UserCatalogTab.tsx` | Users, credential generation, city and administration tabs |
+| `client/src/pages/LoginPage.tsx`, `LoginChangePasswordModal.tsx` | Lockout display, first-login change |
+
+**Right-to-left:** `client/index.html` sets `lang="ar" dir="rtl"`. Directional Tailwind classes
+were converted to logical ones (`ms-`/`pe-`/`start-`/`text-start`, and so on). The print views that
+were already right-to-left keep their physical classes.

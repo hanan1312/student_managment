@@ -133,6 +133,20 @@ export const api = {
   deleteLevel: (token: string, levelId: number) =>
     request<{ tree: any[]; flat: any[] }>(`/classes/levels/${levelId}`, { method: "DELETE", token }),
 
+  moveStage: (token: string, stageId: number, beforeId: number | null) =>
+    request<{ tree: any[]; flat: any[] }>(`/classes/stages/${stageId}/position`, {
+      method: "PUT",
+      body: JSON.stringify({ beforeId }),
+      token,
+    }),
+
+  moveLevel: (token: string, levelId: number, stageId: number, parentId: number | null, beforeId: number | null) =>
+    request<{ tree: any[]; flat: any[] }>(`/classes/levels/${levelId}/position`, {
+      method: "PUT",
+      body: JSON.stringify({ stageId, parentId, beforeId }),
+      token,
+    }),
+
   renameClass: (token: string, classId: number, name: string) =>
     request<{ tree: any[]; flat: any[] }>(`/classes/${classId}`, {
       method: "PUT",
