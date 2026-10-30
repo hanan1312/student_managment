@@ -36,11 +36,15 @@ type CertificateOptions = {
   showPercentage: boolean;
   showStatus: boolean;
   showDate: boolean;
+  showMoeCode: boolean;
 };
 
 // A certificate column: a subject, or المجموع (which sits after the subjects in the total and
 // before those خارج المجموع).
 type CertColumn = { kind: "subject"; grade: StudentGrade } | { kind: "total" };
+
+// إدارة and ادارة (and أ / آ) are the same word as typed by different people.
+const normalizeAlef = (text: string) => text.replace(/[أإآ]/g, "ا").trim();
 
 // One student's degrees certificate. The header names the directorate and the education
 // administration of the student's school (إضافة مدرسة → الإدارة). The subjects run across (one
@@ -60,8 +64,9 @@ function Certificate({
   const school = schools.find((s) => s.name.trim() === student.school?.trim());
   const adminName = school?.education_admin_name?.trim() || school?.directorate?.trim() || "";
   const adminPrefix = t("print.adminPrefix");
-  // Administrations are often named "إدارة …" already; don't print the word twice.
-  const adminLine = adminName && !adminName.startsWith(adminPrefix) ? `${adminPrefix} ${adminName}` : adminName;
+  // Administrations are often named "إدارة …" / "ادارة …" already; don't print the word twice.
+  const adminLine =
+    adminName && !normalizeAlef(adminName).startsWith(normalizeAlef(adminPrefix)) ? `${adminPrefix} ${adminName}` : adminName;
   const totals = degreeTotals(student.grades);
   const status = passStatus(totals.percentage);
   const cell = "border border-slate-400 px-1.5 py-1 text-center";
@@ -117,8 +122,12 @@ function Certificate({
         <span className="font-medium">{settings.academic_year || "—"}</span>
         <span className="text-slate-500">الصف</span>
         <span className="font-medium">{student.section || "—"}</span>
-        <span className="text-slate-500">كود الحكومة الالكترونية</span>
-        <span className="col-span-3 font-medium">{formatMoeCode(student.moe_code) || "—"}</span>
+        {options.showMoeCode && (
+          <>
+            <span className="text-slate-500">كود الحكومة الالكترونية</span>
+            <span className="col-span-3 font-medium">{formatMoeCode(student.moe_code) || "—"}</span>
+          </>
+        )}
       </div>
 
       <table className="w-full border-collapse">
@@ -186,6 +195,7 @@ export default function StudentCertificateModal({
     showPercentage: true,
     showStatus: true,
     showDate: true,
+    showMoeCode: false,
   }));
   const signatures = useSignatures(true);
   const [orientation, setOrientation] = useState<Orientation>("landscape");
@@ -239,6 +249,7 @@ export default function StudentCertificateModal({
         <OptionCheckbox label="النسبة المئوية" checked={options.showPercentage} onChange={setOption("showPercentage")} />
         <OptionCheckbox label="الحالة (ناجح / راسب)" checked={options.showStatus} onChange={setOption("showStatus")} />
         <OptionCheckbox label="تاريخ الطباعة" checked={options.showDate} onChange={setOption("showDate")} />
+        <OptionCheckbox label="كود الحكومة الالكترونية" checked={options.showMoeCode} onChange={setOption("showMoeCode")} />
       </OptionSection>
 
       <SignatureOptions signatures={signatures} />

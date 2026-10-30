@@ -253,10 +253,11 @@ Changing the degree itself picks up the section's current marks.
 ### Certificate (بيان نجاح طالب)
 
 - **Header:** on the right, **مديرية التربية و التعليم** and **إدارة …**: the الإدارة set for the
-  student's school in **إضافة مدرسة** (shown once if its name already starts with "إدارة"). Title in
+  student's school in **إضافة مدرسة** (shown once if its name already starts with "إدارة" or "ادارة"). Title in
   the middle, the logo on the left. **تاريخ الطباعة** is on the left of the page, under the header.
-- **Student details:** on the right الاسم, الرقم القومى, العام الدراسي (from Preferences) and كود
-  الحكومة الالكترونية; on the left المدرسة, المرحلة and الصف.
+- **Student details:** on the right الاسم, الرقم القومى and العام الدراسي (from Preferences); on the
+  left المدرسة, المرحلة and الصف. كود الحكومة الالكترونية is hidden by default and can be turned on in
+  the preview options.
 - **Horizontal table:** one column per subject, with **المجموع** after the subjects in the total
   and before the subjects خارج المجموع (which are marked). Rows: النهاية الكبرى, النهاية الصغرى,
   الدرجة.
@@ -357,7 +358,8 @@ still only on حفظ). Who can open it: admins, the master account, and users gi
 **Texts** (empty = the default shown in grey):
 
 - **الأقسام الرئيسية:** شئون الطلاب, شئون العاملين.
-- **أزرار شريط الطلاب:** the group caption and each button.
+- **أزرار شريط الطلاب:** the group caption and each button. Each button also has **ظاهر / مخفي**: a
+  hidden button is gone for every user. The المستخدمين button is hidden with its tab, above.
 - **نصوص الطباعة (PDF):** the certificate title, its header lines (مديرية التربية و التعليم, the word
   before the administration's name), the default titles of the Students and Degrees prints, the
   "تاريخ الطباعة" label, and the two default signatures.
@@ -379,7 +381,7 @@ except the two clean-ups noted at the end of this section.
 | Users — stages | New `users.stages_restricted` flag and `user_stages` table (the stages a limited user manages) |
 | Students — نوع القيد | New `students.enrollment_type` (مستجد / غير مستجد) |
 | Students — الجنسية | Uses the existing `students.nationality` column |
-| Settings — التحكم | New `ui_control` setting (JSON): hidden / renamed tabs, يتبع links, added tabs, texts |
+| Settings — التحكم | New `ui_control` setting (JSON): hidden / renamed tabs, يتبع links, added tabs, texts, hidden ribbon buttons |
 | Degrees | One degree per subject (`student_grades.score`). `score_min` is kept in the table but no longer entered; it is cleared when a student's degrees are saved again |
 
 Clean-ups:

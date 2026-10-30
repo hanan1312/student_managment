@@ -380,13 +380,20 @@ export default function StudentsPage() {
         <RibbonGroup
           caption={ui.t("ribbon.caption")}
           buttons={[
-            { label: ui.t("ribbon.newStudent"), icon: UserPlus, onClick: () => setModalOpen(true) },
-            { label: ui.t("ribbon.import"), icon: Upload, onClick: () => setImportOpen(true) },
-            { label: ui.t("ribbon.export"), icon: Download, onClick: handleExport },
-            { label: ui.t("ribbon.print"), icon: Printer, onClick: () => setPrintOpen(true) },
-            { label: ui.t("ribbon.subjects"), icon: BookMarked, onClick: () => setSubjectsOpen(true) },
-            { label: ui.t("ribbon.degrees"), icon: GraduationCap, onClick: () => setDegreesOpen(true) },
-            { label: ui.t("ribbon.schools"), icon: Building2, onClick: () => setSchoolsOpen(true) },
+            // Named and shown or hidden in التحكم.
+            ...(
+              [
+                { key: "ribbon.newStudent", icon: UserPlus, onClick: () => setModalOpen(true) },
+                { key: "ribbon.import", icon: Upload, onClick: () => setImportOpen(true) },
+                { key: "ribbon.export", icon: Download, onClick: handleExport },
+                { key: "ribbon.print", icon: Printer, onClick: () => setPrintOpen(true) },
+                { key: "ribbon.subjects", icon: BookMarked, onClick: () => setSubjectsOpen(true) },
+                { key: "ribbon.degrees", icon: GraduationCap, onClick: () => setDegreesOpen(true) },
+                { key: "ribbon.schools", icon: Building2, onClick: () => setSchoolsOpen(true) },
+              ] as const
+            )
+              .filter((b) => ui.isButtonVisible(b.key))
+              .map((b) => ({ label: ui.t(b.key), icon: b.icon, onClick: b.onClick })),
             // المستخدمين is a tab of its own in التحكم: renaming or hiding it applies to this button.
             ...(hasModule("control") && ui.isTabVisible("control")
               ? [{ label: ui.tabLabel("control"), icon: ShieldCheck, onClick: () => navigate("/users") }]

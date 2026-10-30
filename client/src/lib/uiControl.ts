@@ -24,9 +24,11 @@ export type UiControl = {
   tabs: Record<string, TabControl>;
   customTabs: CustomTab[];
   texts: Record<string, string>;
+  // Students ribbon buttons hidden from everyone, by text key (e.g. "ribbon.print").
+  hiddenButtons: Record<string, boolean>;
 };
 
-export const EMPTY_UI_CONTROL: UiControl = { tabs: {}, customTabs: [], texts: {} };
+export const EMPTY_UI_CONTROL: UiControl = { tabs: {}, customTabs: [], texts: {}, hiddenButtons: {} };
 
 export function parseUiControl(raw: string | undefined): UiControl {
   if (!raw) return EMPTY_UI_CONTROL;
@@ -36,6 +38,7 @@ export function parseUiControl(raw: string | undefined): UiControl {
       tabs: parsed.tabs && typeof parsed.tabs === "object" ? parsed.tabs : {},
       customTabs: Array.isArray(parsed.customTabs) ? parsed.customTabs : [],
       texts: parsed.texts && typeof parsed.texts === "object" ? parsed.texts : {},
+      hiddenButtons: parsed.hiddenButtons && typeof parsed.hiddenButtons === "object" ? parsed.hiddenButtons : {},
     };
   } catch {
     return EMPTY_UI_CONTROL;
@@ -167,6 +170,7 @@ export function useUiControl() {
       sectionLabel: (key: SectionKey) =>
         config.texts[`section.${key}`]?.trim() || SECTIONS.find((s) => s.key === key)?.label || key,
       t: (key: TextKey) => config.texts[key]?.trim() || TEXTS[key].default,
+      isButtonVisible: (key: TextKey) => !config.hiddenButtons[key],
     };
   }, [settings.ui_control, user]);
 }

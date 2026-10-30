@@ -320,22 +320,52 @@ export default function ControlPage() {
             <Card
               key={group.key}
               title={group.label}
-              hint={group.key === "print" ? "تُستخدم في معاينات الطباعة وملفات PDF. التوقيعات المعدّلة داخل معاينة الطباعة تبقى كما هي حتى الضغط على «الافتراضي» هناك." : undefined}
+              hint={
+                group.key === "print"
+                  ? "تُستخدم في معاينات الطباعة وملفات PDF. التوقيعات المعدّلة داخل معاينة الطباعة تبقى كما هي حتى الضغط على «الافتراضي» هناك."
+                  : group.key === "ribbon"
+                    ? "الزر المخفي لا يظهر لأي مستخدم. زر المستخدمين يُخفى من قائمة التبويبات أعلاه."
+                    : undefined
+              }
             >
               <div className="grid gap-3 sm:grid-cols-2">
                 {(Object.keys(TEXTS) as TextKey[])
                   .filter((key) => TEXTS[key].group === group.key)
-                  .map((key) => (
-                    <label key={key} className="block text-xs text-slate-500">
-                      {TEXTS[key].label}
-                      <input
-                        value={draft.texts[key] ?? ""}
-                        placeholder={TEXTS[key].default}
-                        onChange={(e) => setText(key, e.target.value)}
-                        className={`${inputClass} mt-1`}
-                      />
-                    </label>
-                  ))}
+                  .map((key) => {
+                    // Ribbon buttons (not the group caption) can also be hidden.
+                    const hideable = group.key === "ribbon" && key !== "ribbon.caption";
+                    const hidden = Boolean(draft.hiddenButtons[key]);
+                    return (
+                      <label key={key} className="block text-xs text-slate-500">
+                        {TEXTS[key].label}
+                        <span className="mt-1 flex items-center gap-2">
+                          <input
+                            value={draft.texts[key] ?? ""}
+                            placeholder={TEXTS[key].default}
+                            onChange={(e) => setText(key, e.target.value)}
+                            className={`${inputClass} min-w-0 flex-1`}
+                          />
+                          {hideable && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                change((d) => ({ ...d, hiddenButtons: { ...d.hiddenButtons, [key]: !hidden } }))
+                              }
+                              className={`flex w-20 shrink-0 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition ${
+                                hidden
+                                  ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              }`}
+                              title={hidden ? "إظهار الزر" : "إخفاء الزر"}
+                            >
+                              {hidden ? <EyeOff size={12} /> : <Eye size={12} />}
+                              {hidden ? "مخفي" : "ظاهر"}
+                            </button>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
               </div>
             </Card>
           ))}
