@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { useSchools } from "../context/SchoolsContext";
+import { useSettings } from "../context/SettingsContext";
 import { degreeTotals, formatDegree, formatPercentage, passStatus, splitByOutside, statusTextClass } from "../lib/degrees";
 import { useSignatures, type Signatures } from "../lib/print";
 import { formatMoeCode } from "../lib/studentColumns";
 import type { StudentGrade } from "../lib/types";
+import { useUiControl } from "../lib/uiControl";
 import {
   LayoutOptions,
   OptionCheckbox,
@@ -39,8 +42,9 @@ type CertificateOptions = {
 // before those خارج المجموع).
 type CertColumn = { kind: "subject"; grade: StudentGrade } | { kind: "total" };
 
-// One student's degrees certificate. The subjects run across (one column each), with rows for
-// النهاية الكبرى, النهاية الصغرى and الدرجة.
+// One student's degrees certificate. The header names the directorate and the education
+// administration of the student's school (إضافة مدرسة → الإدارة). The subjects run across (one
+// column each), with rows for النهاية الكبرى, النهاية الصغرى and الدرجة.
 function Certificate({
   student,
   options,
@@ -50,6 +54,14 @@ function Certificate({
   options: CertificateOptions;
   signatures: Signatures;
 }) {
+  const { settings } = useSettings();
+  const { schools } = useSchools();
+  const { t } = useUiControl();
+  const school = schools.find((s) => s.name.trim() === student.school?.trim());
+  const adminName = school?.education_admin_name?.trim() || school?.directorate?.trim() || "";
+  const adminPrefix = t("print.adminPrefix");
+  // Administrations are often named "إدارة …" already; don't print the word twice.
+  const adminLine = adminName && !adminName.startsWith(adminPrefix) ? `${adminPrefix} ${adminName}` : adminName;
   const totals = degreeTotals(student.grades);
   const status = passStatus(totals.percentage);
   const cell = "border border-slate-400 px-1.5 py-1 text-center";
@@ -79,19 +91,34 @@ function Certificate({
 
   return (
     <div className="space-y-3">
-      <PrintSheetHeader title={options.title} schoolName={student.school} showDate={options.showDate} />
+      <PrintSheetHeader
+        title={options.title}
+        showDate={options.showDate}
+        dateOnLeft
+        lines={
+          <>
+            <p className="font-bold">{t("print.directorate")}</p>
+            <p className="font-bold">{adminLine || `${adminPrefix} —`}</p>
+          </>
+        }
+      />
 
+      {/* The student on the right, the school and placement on the left. */}
       <div className="grid grid-cols-[auto_1fr_auto_1fr] gap-x-4 gap-y-1">
         <span className="text-slate-500">الاسم</span>
-        <span className="col-span-3 font-bold">{student.name}</span>
+        <span className="font-bold">{student.name}</span>
+        <span className="text-slate-500">المدرسة</span>
+        <span className="font-medium">{student.school || "—"}</span>
         <span className="text-slate-500">الرقم القومى</span>
         <span className="font-medium">{student.national_id || "—"}</span>
-        <span className="text-slate-500">كود الحكومة الالكترونية</span>
-        <span className="font-medium">{formatMoeCode(student.moe_code) || "—"}</span>
         <span className="text-slate-500">المرحلة</span>
         <span className="font-medium">{student.division || "—"}</span>
+        <span className="text-slate-500">العام الدراسي</span>
+        <span className="font-medium">{settings.academic_year || "—"}</span>
         <span className="text-slate-500">الصف</span>
         <span className="font-medium">{student.section || "—"}</span>
+        <span className="text-slate-500">كود الحكومة الالكترونية</span>
+        <span className="col-span-3 font-medium">{formatMoeCode(student.moe_code) || "—"}</span>
       </div>
 
       <table className="w-full border-collapse">
@@ -150,15 +177,16 @@ export default function StudentCertificateModal({
   students: CertificateStudent[];
   onClose: () => void;
 }) {
+  const { t } = useUiControl();
   const [included, setIncluded] = useState<Set<number>>(() => new Set(students.map((s) => s.id)));
-  const [options, setOptions] = useState<CertificateOptions>({
-    title: "شهادة درجات",
+  const [options, setOptions] = useState<CertificateOptions>(() => ({
+    title: t("print.certificateTitle"),
     showMax: true,
     showMin: true,
     showPercentage: true,
     showStatus: true,
     showDate: true,
-  });
+  }));
   const signatures = useSignatures(true);
   const [orientation, setOrientation] = useState<Orientation>("landscape");
   const [fontSize, setFontSize] = useState(12);
@@ -223,7 +251,7 @@ export default function StudentCertificateModal({
 
   return (
     <PrintModalShell
-      heading={`شهادة الدرجات${students.length > 1 ? ` (${printed.length})` : ""}`}
+      heading={`${options.title}${students.length > 1 ? ` (${printed.length})` : ""}`}
       orientation={orientation}
       fontSize={fontSize}
       canPrint={printed.length > 0}

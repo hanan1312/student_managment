@@ -17,6 +17,7 @@ import {
   type Orientation,
 } from "./PrintParts";
 import { moveItem, useSignatures } from "../lib/print";
+import { useUiControl } from "../lib/uiControl";
 
 const COLUMN_MAP = new Map(STUDENT_COLUMNS.map((c) => [c.key, c]));
 const NO_DIVISION = "غير محدد";
@@ -62,7 +63,8 @@ export default function StudentsPrintModal({
     const visible = new Set(loadVisibleColumns());
     return STUDENT_COLUMNS.filter((c) => visible.has(c.key)).map((c) => c.key);
   });
-  const [title, setTitle] = useState("كشف بيانات الطلاب");
+  const { t } = useUiControl();
+  const [title, setTitle] = useState(() => t("print.studentsTitle"));
   const [orientation, setOrientation] = useState<Orientation>(() => (columns.length > 7 ? "landscape" : "portrait"));
   const [fontSize, setFontSize] = useState(11);
   const [showSections, setShowSections] = useState(true);

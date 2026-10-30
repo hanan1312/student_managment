@@ -17,6 +17,7 @@ Visible today:
 
 - **شئون الطلاب → الطلاب**, with the ribbon buttons: طالب جديد، استيراد، تصدير، طباعة، المواد، ملف الدرجات، إضافة مدرسة، المستخدمين.
 - **الإعدادات** (Preferences), which holds the **العام الدراسي** used for students' age.
+- **التحكم** (Control), next to الإعدادات (see §7).
 - **المستخدمين** (Users), opened from the Students ribbon.
 
 The whole interface is in **Arabic** and laid out **right-to-left**.
@@ -249,10 +250,13 @@ Changing the degree itself picks up the section's current marks.
   - **Checkboxes** select students. **طباعة الشهادات (n)** prints a certificate for each ticked
     student in the current view. The print icon on a row prints that student's certificate.
 
-### Certificate (شهادة درجات)
+### Certificate (بيان نجاح طالب)
 
-- Header with the school logo, school name, academic year and the date of printing, then the
-  student's name, الرقم القومي, كود الحكومة الالكترونية, المرحلة and الصف.
+- **Header:** on the right, **مديرية التربية و التعليم** and **إدارة …**: the الإدارة set for the
+  student's school in **إضافة مدرسة** (shown once if its name already starts with "إدارة"). Title in
+  the middle, the logo on the left. **تاريخ الطباعة** is on the left of the page, under the header.
+- **Student details:** on the right الاسم, الرقم القومى, العام الدراسي (from Preferences) and كود
+  الحكومة الالكترونية; on the left المدرسة, المرحلة and الصف.
 - **Horizontal table:** one column per subject, with **المجموع** after the subjects in the total
   and before the subjects خارج المجموع (which are marked). Rows: النهاية الكبرى, النهاية الصغرى,
   الدرجة.
@@ -264,9 +268,10 @@ Changing the degree itself picks up the section's current marks.
 ### Signatures (all print previews)
 
 The Students print, the ملف الدرجات table print and the certificate all have a **التوقيعات**
-section. The captions (default **شئون الطلاب** and **مدير المدرسة**) can be edited, removed, or
+section. The captions (default **شئون الطلاب** and **مدير الإدارة**) can be edited, removed, or
 added to (up to 4). They are remembered in this browser for the next printout; **الافتراضي** puts
-the two defaults back. Signatures are on by default for certificates and off for the two tables.
+the two defaults back. The defaults can be changed in **التحكم**. A caption saved as
+"مدير المدرسة" before the rename now shows as "مدير الإدارة". Signatures are on by default for certificates and off for the two tables.
 
 ---
 
@@ -299,7 +304,7 @@ Both use the same form:
 Opened with the lock icon on a user's row (admins and the master account only).
 
 - **Modules:** only the parts the app currently shows are offered: **الطلاب** (students, import,
-  export, print, subjects, degrees), **المستخدمين** and **الإعدادات**. Grants for hidden modules are
+  export, print, subjects, degrees), **المستخدمين**, **الإعدادات** and **التحكم**. Grants for hidden modules are
   kept as they are, so turning the extended features back on loses nothing.
 - **المراحل:** **كل المراحل** (the default), or tick the stages the user manages. A user limited to
   some stages:
@@ -326,7 +331,40 @@ Opened with the lock icon on a user's row (admins and the master account only).
 
 ---
 
-## 7. Data changes
+## 7. Control (التحكم)
+
+The **التحكم** tab sits next to **الإعدادات**. Changes are a draft until **حفظ**; **الافتراضي**
+clears everything back to the app's own names and removes added tabs (after a confirmation, and
+still only on حفظ). Who can open it: admins, the master account, and users given **التحكم** in
+إدارة الصلاحيات.
+
+**التبويبات** (one row per tab, grouped by section):
+
+| Control | What it does |
+|---|---|
+| Name box | The tab's name everywhere it's shown. Empty = its own name |
+| **يتبع** | Links the tab to another tab of its section: it sits right after that tab (marked ↵), is hidden whenever that tab is hidden, and an added tab lists it under "تبويبات مرتبطة" |
+| **ظاهر / مخفي** | A hidden tab disappears from the tab row for other users, and opening its address takes them to the first tab they can open. Whoever manages التحكم still sees it, marked with a crossed-out eye, so they can't lock themselves out |
+| ⌄ / 🗑 (added tabs) | Edit an added tab's name, section and text; delete it |
+
+- **تبويب جديد** adds a tab (name + section). An added tab is a page with its title and free text.
+- **المستخدمين** (opened from the Students ribbon) is listed too: renaming or hiding it changes that
+  ribbon button.
+- Built-in tabs can be hidden but not deleted. The modules switched off with
+  `SHOW_EXTENDED_FEATURES` (Finance, HR, …) are not offered.
+- Hiding a tab only hides it in the app. It doesn't change anyone's permissions (إدارة الصلاحيات).
+
+**Texts** (empty = the default shown in grey):
+
+- **الأقسام الرئيسية:** شئون الطلاب, شئون العاملين.
+- **أزرار شريط الطلاب:** the group caption and each button.
+- **نصوص الطباعة (PDF):** the certificate title, its header lines (مديرية التربية و التعليم, the word
+  before the administration's name), the default titles of the Students and Degrees prints, the
+  "تاريخ الطباعة" label, and the two default signatures.
+
+---
+
+## 8. Data changes
 
 All changes are additive and run automatically when the server starts. No existing data was removed,
 except the two clean-ups noted at the end of this section.
@@ -341,6 +379,7 @@ except the two clean-ups noted at the end of this section.
 | Users — stages | New `users.stages_restricted` flag and `user_stages` table (the stages a limited user manages) |
 | Students — نوع القيد | New `students.enrollment_type` (مستجد / غير مستجد) |
 | Students — الجنسية | Uses the existing `students.nationality` column |
+| Settings — التحكم | New `ui_control` setting (JSON): hidden / renamed tabs, يتبع links, added tabs, texts |
 | Degrees | One degree per subject (`student_grades.score`). `score_min` is kept in the table but no longer entered; it is cleared when a student's degrees are saved again |
 
 Clean-ups:
@@ -350,7 +389,7 @@ Clean-ups:
 
 ---
 
-## 8. Open items and decisions
+## 9. Open items and decisions
 
 1. **70% pass mark** for التربية الدينية: the charts set its pass mark at 70%, but the
    كبرى = صغرى × 2 rule assumes 50%. A per-subject pass-percentage setting would solve this.
@@ -370,7 +409,7 @@ Clean-ups:
 
 ---
 
-## 9. How it was checked
+## 10. How it was checked
 
 - The server rules were tested end to end against **copies** of the real database, never the live
   one. This covered:
@@ -386,7 +425,7 @@ Clean-ups:
 
 ---
 
-## 10. Technical reference (for developers)
+## 11. Technical reference (for developers)
 
 **Feature switch:** `client/src/lib/features.ts`
 
@@ -406,6 +445,7 @@ Clean-ups:
 | `server/src/routes/schools.ts` | Schools (shared with HR); `city_id` / `education_admin_id` (`migrateSchoolsColumns`); renaming updates `students.school`. Open to `students` too |
 | `server/src/routes/auth.ts` | Lockout (5 tries, 5 minutes); first-login password change through `/auth/reset-password` |
 | `server/src/permissions.ts` | `requireModule(...)` accepts several modules (any one is enough); `getStageScope` (stages a user may manage, `null` = all) |
+| `server/src/routes/settings.ts` | `PUT /settings/ui-control` (needs `controlPanel`) saves the التحكم configuration; the Preferences save ignores `ui_control` |
 | `server/src/routes/permissions.ts` | Modules and `stageIds` (`null` = every stage) per user |
 
 **Client**
@@ -422,6 +462,8 @@ Clean-ups:
 | `client/src/lib/degrees.ts` | `degreeTotals` (outside-total and choose-one rules, percentage), `passStatus` (ناجح / راسب), `autoMaxFromMin` (×2 rule for marks), print helper |
 | `client/src/components/PrintParts.tsx` | Shared print-preview pieces (modal, logo/date header, layout options, column and row controls) used by the Students print, the Degrees table print and certificates |
 | `client/src/components/DegreesTablePrintModal.tsx` | ملف الدرجات → طباعة الكل |
+| `client/src/lib/uiControl.ts` | التحكم configuration: `useUiControl()` (`t(key)` texts, `tabLabel`, `isTabVisible`), `TEXTS` (every editable text and its default), `buildTabs`, `orderWithChildren` |
+| `client/src/pages/ControlPage.tsx`, `CustomTabPage.tsx`, `components/HiddenTab.tsx` | التحكم screen; an added tab's page (`/custom/:key`); redirect away from a hidden tab |
 | `client/src/lib/studentAge.ts` | Age on 1 October |
 | `client/src/lib/useColumnOrder.ts` | Drag-to-reorder table columns (`useColumnOrder`, `orderedCells`); saved in `localStorage` as `column_order:<table>`; drag styles in `index.css` |
 | `client/src/components/ClassTree.tsx` | Nested tree; drag mode (`ArrangeContext`, `useArrangeRow`) |

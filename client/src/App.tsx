@@ -15,6 +15,7 @@ import BusesPage from "./pages/BusesPage";
 import InventoryPage from "./pages/InventoryPage";
 import UsersPage from "./pages/UsersPage";
 import ControlPage from "./pages/ControlPage";
+import CustomTabPage from "./pages/CustomTabPage";
 import ManagementPage from "./pages/ManagementPage";
 import PreferencesPage from "./pages/PreferencesPage";
 import ConfigurationPage from "./pages/ConfigurationPage";
@@ -23,7 +24,9 @@ import HrPayrollPage from "./pages/hr/PayrollPage";
 import HrConfigurationPage from "./pages/hr/ConfigurationPage";
 import HrThemesPage from "./pages/hr/ThemesPage";
 import DashboardLayout from "./components/DashboardLayout";
+import HiddenTab from "./components/HiddenTab";
 import { CORE_MODULE_KEYS, SHOW_EXTENDED_FEATURES } from "./lib/features";
+import { useUiControl } from "./lib/uiControl";
 
 function ProtectedArea() {
   const { user, bootstrapping } = useAuth();
@@ -47,7 +50,9 @@ function ProtectedArea() {
 
 function RequireModule({ moduleKey, children }: { moduleKey: string; children: ReactNode }) {
   const { hasModule } = useAuth();
+  const ui = useUiControl();
   if (!SHOW_EXTENDED_FEATURES && !CORE_MODULE_KEYS.includes(moduleKey)) return <Navigate to="/" replace />;
+  if (!ui.isTabVisible(moduleKey)) return <HiddenTab />;
   if (!hasModule(moduleKey)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
@@ -125,6 +130,7 @@ export default function App() {
                 </RequireModule>
               }
             />
+            <Route path="custom/:key" element={<CustomTabPage />} />
             <Route
               path="management"
               element={

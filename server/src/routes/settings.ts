@@ -36,6 +36,10 @@ const upload = multer({
   },
 });
 
+// The التحكم tab's configuration (hidden tabs, renamed tabs and texts, added tabs, relations),
+// stored as one JSON value. Every signed-in user reads it through GET /settings.
+const UI_CONTROL_KEY = "ui_control";
+
 function getSetting(key: string): string | null {
   const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
   return row?.value ?? null;
@@ -78,7 +82,24 @@ settingsRouter.put("/", requireAuth, requireModule("configuration"), (req, res) 
   const tx = db.transaction((entries: [string, string][]) => {
     for (const [key, value] of entries) upsert.run(key, value);
   });
-  tx(Object.entries(b));
+  // ui_control belongs to the التحكم tab (below); the Preferences form sends every setting back,
+  // so a stale copy of it must not overwrite the Control tab's.
+  tx(Object.entries(b).filter(([key]) => key !== UI_CONTROL_KEY));
+
+  res.json({ settings: allSettings() });
+});
+
+settingsRouter.put("/ui-control", requireAuth, requireModule("controlPanel"), (req, res) => {
+  const value = req.body?.value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return res.status(400).json({ error: "value must be an object" });
+  }
+  const json = JSON.stringify(value);
+  if (json.length > 500_000) return res.status(400).json({ error: "Control configuration is too large" });
+
+  db.prepare(
+    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).run(UI_CONTROL_KEY, json);
 
   res.json({ settings: allSettings() });
 });

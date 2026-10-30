@@ -28,6 +28,7 @@ import { downloadExcel } from "../lib/excel";
 import { broadcastChange, useSyncListener } from "../lib/liveSync";
 import { genderLabel } from "../lib/studentColumns";
 import { SHOW_EXTENDED_FEATURES } from "../lib/features";
+import { useUiControl } from "../lib/uiControl";
 import { passStatus } from "../lib/degrees";
 import { ageOn, ageReferenceDate } from "../lib/studentAge";
 import { useSettings } from "../context/SettingsContext";
@@ -139,6 +140,7 @@ type OutletCtx = { notify: (label: string) => void };
 export default function StudentsPage() {
   useOutletContext<OutletCtx>();
   const { token, hasModule } = useAuth();
+  const ui = useUiControl();
   const { settings } = useSettings();
   const navigate = useNavigate();
   const [degreesOpen, setDegreesOpen] = useState(false);
@@ -376,16 +378,19 @@ export default function StudentsPage() {
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm">
         <RibbonGroup
-          caption="الطلاب"
+          caption={ui.t("ribbon.caption")}
           buttons={[
-            { label: "طالب جديد", icon: UserPlus, onClick: () => setModalOpen(true) },
-            { label: "استيراد", icon: Upload, onClick: () => setImportOpen(true) },
-            { label: "تصدير", icon: Download, onClick: handleExport },
-            { label: "طباعة", icon: Printer, onClick: () => setPrintOpen(true) },
-            { label: "المواد", icon: BookMarked, onClick: () => setSubjectsOpen(true) },
-            { label: "ملف الدرجات", icon: GraduationCap, onClick: () => setDegreesOpen(true) },
-            { label: "إضافة مدرسة", icon: Building2, onClick: () => setSchoolsOpen(true) },
-            ...(hasModule("control") ? [{ label: "المستخدمين", icon: ShieldCheck, onClick: () => navigate("/users") }] : []),
+            { label: ui.t("ribbon.newStudent"), icon: UserPlus, onClick: () => setModalOpen(true) },
+            { label: ui.t("ribbon.import"), icon: Upload, onClick: () => setImportOpen(true) },
+            { label: ui.t("ribbon.export"), icon: Download, onClick: handleExport },
+            { label: ui.t("ribbon.print"), icon: Printer, onClick: () => setPrintOpen(true) },
+            { label: ui.t("ribbon.subjects"), icon: BookMarked, onClick: () => setSubjectsOpen(true) },
+            { label: ui.t("ribbon.degrees"), icon: GraduationCap, onClick: () => setDegreesOpen(true) },
+            { label: ui.t("ribbon.schools"), icon: Building2, onClick: () => setSchoolsOpen(true) },
+            // المستخدمين is a tab of its own in التحكم: renaming or hiding it applies to this button.
+            ...(hasModule("control") && ui.isTabVisible("control")
+              ? [{ label: ui.tabLabel("control"), icon: ShieldCheck, onClick: () => navigate("/users") }]
+              : []),
             ...(SHOW_EXTENDED_FEATURES
               ? [
                   { label: "Students Data", icon: Table2, onClick: () => loadStudents() },

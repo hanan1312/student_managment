@@ -1,20 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { GraduationCap, LogOut, ChevronDown, KeyRound } from "lucide-react";
+import { GraduationCap, LogOut, ChevronDown, KeyRound, EyeOff, CornerDownLeft } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import ClassTree from "./ClassTree";
 import HrEmployeeTree from "./hr/HrEmployeeTree";
 import { useSettings } from "../context/SettingsContext";
 import { assetUrl } from "../lib/api";
-import { MODULES, SECTIONS, type SectionKey } from "../lib/modules";
-import { CORE_MODULE_KEYS, SHOW_EXTENDED_FEATURES } from "../lib/features";
+import { SECTIONS, type SectionKey } from "../lib/modules";
+import { orderWithChildren, useUiControl, type AppTab } from "../lib/uiControl";
 import BackgroundWatermark from "./BackgroundWatermark";
 import ChangePasswordModal from "./ChangePasswordModal";
 import { roleLabel } from "./SystemUserModal";
 
-function sectionForPath(pathname: string): SectionKey {
-  const match = MODULES.find((m) => m.path === pathname || (m.path !== "/" && pathname.startsWith(m.path)));
+function sectionForPath(tabs: AppTab[], pathname: string): SectionKey {
+  const match = tabs.find((m) => m.path === pathname || (m.path !== "/" && pathname.startsWith(m.path)));
   return match?.section ?? "studentsAffair";
 }
 
@@ -50,10 +50,11 @@ function StatusFooter({ userLabel, licenseTo, academicYear }: { userLabel: strin
 export default function DashboardLayout() {
   const { user, logout, hasModule } = useAuth();
   const { settings } = useSettings();
+  const ui = useUiControl();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [notice, setNotice] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<SectionKey>(() => sectionForPath(pathname));
+  const [activeSection, setActiveSection] = useState<SectionKey>(() => sectionForPath(ui.tabs, pathname));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [accountMenuRect, setAccountMenuRect] = useState<DOMRect | null>(null);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -72,20 +73,18 @@ export default function DashboardLayout() {
   }, [accountMenuRect]);
 
   useEffect(() => {
-    setActiveSection(sectionForPath(pathname));
-  }, [pathname]);
+    setActiveSection(sectionForPath(ui.tabs, pathname));
+  }, [pathname, ui.tabs]);
 
   // "Users" (key "control") stays a real, reachable module — it's just hidden from this tab
-  // row per product request, not removed from permissions/routing.
-  const sectionModules = MODULES.filter(
-    (m) =>
-      m.section === activeSection &&
-      m.key !== "control" &&
-      (SHOW_EXTENDED_FEATURES || CORE_MODULE_KEYS.includes(m.key))
+  // row per product request, not removed from permissions/routing (AppTab.inNav). Tabs hidden in
+  // التحكم are left out for everyone but whoever manages التحكم.
+  const navTabs = ui.tabs.filter((m) => m.inNav && ui.isTabVisible(m.key));
+  const sectionModules = orderWithChildren(
+    ui.config,
+    navTabs.filter((m) => m.section === activeSection)
   );
-  const visibleSections = SHOW_EXTENDED_FEATURES
-    ? SECTIONS
-    : SECTIONS.filter((sec) => MODULES.some((m) => m.section === sec.key && CORE_MODULE_KEYS.includes(m.key)));
+  const visibleSections = SECTIONS.filter((sec) => navTabs.some((m) => m.section === sec.key));
 
   // A section tab is chrome, not a page by itself — switching it has to navigate into that
   // section's first accessible module, otherwise the module-tab row, sidebar tree and section
@@ -93,8 +92,8 @@ export default function DashboardLayout() {
   // content underneath keeps rendering whatever route you were last on.
   const goToSection = (key: SectionKey) => {
     setActiveSection(key);
-    const target =
-      MODULES.find((m) => m.section === key && hasModule(m.key)) ?? MODULES.find((m) => m.section === key);
+    const inSection = navTabs.filter((m) => m.section === key);
+    const target = inSection.find((m) => m.custom || hasModule(m.key)) ?? inSection[0];
     if (target) navigate(target.path);
   };
 
@@ -201,15 +200,22 @@ export default function DashboardLayout() {
                 : "text-slate-500 hover:bg-white/60 hover:text-slate-700"
             }`}
           >
-            {s.label}
+            {ui.sectionLabel(s.key)}
           </button>
         ))}
       </div>
 
       <nav className="relative z-10 flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-white/95 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-        {sectionModules.map((m) => {
+        {sectionModules.map(({ tab: m, depth }) => {
           const Icon = m.icon;
-          if (!hasModule(m.key)) {
+          // A tab that follows another one (يتبع in التحكم) sits right after it, marked with an arrow.
+          const followMark = depth > 0 && <CornerDownLeft size={12} className="opacity-50" />;
+          const hiddenMark = ui.isHidden(m.key) && (
+            <span title="مخفي عن باقي المستخدمين">
+              <EyeOff size={12} className="opacity-60" />
+            </span>
+          );
+          if (!m.custom && !hasModule(m.key)) {
             return (
               <button
                 key={m.key}
@@ -217,8 +223,10 @@ export default function DashboardLayout() {
                 title="ليس لديك صلاحية للوصول إلى هذا القسم"
                 className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-400 transition hover:bg-slate-100"
               >
+                {followMark}
                 <Icon size={15} />
                 {m.label}
+                {hiddenMark}
               </button>
             );
           }
@@ -236,8 +244,10 @@ export default function DashboardLayout() {
             >
               {({ isActive }) => (
                 <>
+                  {followMark}
                   <Icon size={15} className="transition-transform group-hover:scale-110" />
                   {m.label}
+                  {hiddenMark}
                   {isActive && (
                     <span className="animate-underline-in absolute inset-x-2 -bottom-[7px] h-0.5 rounded-full bg-gold-400" />
                   )}

@@ -5,6 +5,7 @@ import { useSettings } from "../context/SettingsContext";
 import { assetUrl } from "../lib/api";
 import { printOnlyTarget } from "../lib/degrees";
 import type { Signatures } from "../lib/print";
+import { useUiControl } from "../lib/uiControl";
 
 // Shared pieces of the print previews (Students list, Degrees table, degrees certificates):
 // a full-screen modal with an options panel beside an A4 preview sheet. Only the sheet prints
@@ -85,26 +86,37 @@ export function PrintSheetHeader({
   title,
   subtitle,
   schoolName,
+  lines,
   meta,
   showDate = true,
+  dateOnLeft = false,
 }: {
   title: string;
   subtitle?: string;
   // Defaults to the school name from Preferences.
   schoolName?: string | null;
+  // Replaces the school name and academic year at the right of the header.
+  lines?: ReactNode;
   // Shown at the end of the date line, e.g. a count of students.
   meta?: ReactNode;
   showDate?: boolean;
+  // The date at the left of the page (the end of the line) instead of the right.
+  dateOnLeft?: boolean;
 }) {
   const { settings } = useSettings();
+  const { t } = useUiControl();
   const logoUrl = assetUrl(settings.logo_url);
   const printedAt = new Intl.DateTimeFormat("ar-EG", { dateStyle: "long", timeStyle: "short" }).format(new Date());
   return (
     <>
       <header className="mb-3 flex items-center justify-between gap-4 border-b-2 border-slate-700 pb-2">
         <div className="min-w-0 flex-1 space-y-0.5 text-[1.1em]">
-          <p className="font-bold">{schoolName || settings.school_name || "SchoolSuite"}</p>
-          {settings.academic_year && <p>العام الدراسي {settings.academic_year}</p>}
+          {lines ?? (
+            <>
+              <p className="font-bold">{schoolName || settings.school_name || "SchoolSuite"}</p>
+              {settings.academic_year && <p>العام الدراسي {settings.academic_year}</p>}
+            </>
+          )}
         </div>
         <div className="flex-1 text-center">
           <h1 className="text-[1.6em] font-bold">{title}</h1>
@@ -115,8 +127,8 @@ export function PrintSheetHeader({
         </div>
       </header>
       {(showDate || meta) && (
-        <div className="mb-3 flex justify-between text-[0.95em] text-slate-600">
-          <span>{showDate ? `تاريخ الطباعة: ${printedAt}` : ""}</span>
+        <div className={`mb-3 flex justify-between text-[0.95em] text-slate-600 ${dateOnLeft ? "flex-row-reverse" : ""}`}>
+          <span>{showDate ? `${t("print.printedAt")}: ${printedAt}` : ""}</span>
           {meta && <span>{meta}</span>}
         </div>
       )}

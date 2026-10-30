@@ -460,6 +460,13 @@ export const api = {
   updateSettings: (token: string, body: Record<string, string>) =>
     request<{ settings: Record<string, string> }>("/settings", { method: "PUT", body: JSON.stringify(body), token }),
 
+  updateUiControl: (token: string, value: unknown) =>
+    request<{ settings: Record<string, string> }>("/settings/ui-control", {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+      token,
+    }),
+
   getPublicSettings: () => request<{ settings: Record<string, string> }>("/settings/public"),
 
   uploadBranding: async (token: string, kind: "logo" | "background", file: File) => {

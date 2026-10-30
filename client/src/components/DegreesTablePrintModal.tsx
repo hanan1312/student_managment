@@ -10,6 +10,7 @@ import {
   subjectInScope,
 } from "../lib/degrees";
 import { moveItem, useSignatures } from "../lib/print";
+import { useUiControl } from "../lib/uiControl";
 import { formatMoeCode } from "../lib/studentColumns";
 import type { DegreesOverviewStudent, SubjectDegrees } from "../lib/types";
 import {
@@ -127,7 +128,8 @@ export default function DegreesTablePrintModal({
   const columnByKey = useMemo(() => new Map(allColumns.map((c) => [c.key, c])), [allColumns]);
 
   const [columns, setColumns] = useState<string[]>(() => allColumns.map((c) => c.key));
-  const [title, setTitle] = useState("كشف درجات الطلاب");
+  const { t } = useUiControl();
+  const [title, setTitle] = useState(() => t("print.degreesTitle"));
   const [orientation, setOrientation] = useState<Orientation>("landscape");
   const [fontSize, setFontSize] = useState(subjects.length > 8 ? 9 : 11);
   const signatures = useSignatures(false);
