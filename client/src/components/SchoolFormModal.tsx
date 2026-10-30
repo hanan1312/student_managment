@@ -5,9 +5,19 @@ import { useSchools } from "../context/SchoolsContext";
 import { api, ApiError } from "../lib/api";
 import type { School, UserCatalogItem } from "../lib/types";
 import { inputCls } from "./FormLayout";
+import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
 
 // Students > إضافة مدرسة. المدينة and الإدارة come from the Users catalogs; the school's name is
 // what students pick in البيانات الأساسية → المدرسة, and renaming it renames it on them too.
+const COLUMN_LABELS = {
+  name: "اسم المدرسة",
+  address: "العنوان",
+  city: "المدينة",
+  education_admin: "الإدارة",
+  phone: "رقم التليفون",
+};
+const COLUMN_KEYS = Object.keys(COLUMN_LABELS) as (keyof typeof COLUMN_LABELS)[];
+
 const EMPTY = { name: "", address: "", cityId: "" as number | "", educationAdminId: "" as number | "", phone: "" };
 
 export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
@@ -16,6 +26,7 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
   const [cities, setCities] = useState<UserCatalogItem[]>([]);
   const [eduAdmins, setEduAdmins] = useState<UserCatalogItem[]>([]);
   const [form, setForm] = useState(EMPTY);
+  const columns = useColumnOrder("schools", COLUMN_KEYS);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,11 +179,11 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-start text-xs font-bold text-slate-500">
                 <tr>
-                  <th className="px-3 py-2.5 text-start">اسم المدرسة</th>
-                  <th className="px-3 py-2.5 text-start">العنوان</th>
-                  <th className="px-3 py-2.5 text-start">المدينة</th>
-                  <th className="px-3 py-2.5 text-start">الإدارة</th>
-                  <th className="px-3 py-2.5 text-start">رقم التليفون</th>
+                  {columns.order.map((key) => (
+                    <th key={key} {...columns.headerProps(key)} className="px-3 py-2.5 text-start">
+                      {COLUMN_LABELS[key]}
+                    </th>
+                  ))}
                   <th className="px-3 py-2.5" />
                 </tr>
               </thead>
@@ -186,13 +197,17 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
                 ) : (
                   schools.map((school) => (
                     <tr key={school.id} className={editingId === school.id ? "bg-brand-50/60" : "hover:bg-slate-50"}>
-                      <td className="px-3 py-2.5 font-semibold text-slate-700">{school.name}</td>
-                      <td className="px-3 py-2.5 text-slate-600">{school.address}</td>
-                      <td className="px-3 py-2.5 text-slate-600">{school.city_name}</td>
-                      <td className="px-3 py-2.5 text-slate-600">{school.education_admin_name}</td>
-                      <td className="px-3 py-2.5 text-slate-600" dir="ltr">
-                        {school.phone}
-                      </td>
+                      {orderedCells(columns.order, {
+                        name: <td className="px-3 py-2.5 font-semibold text-slate-700">{school.name}</td>,
+                        address: <td className="px-3 py-2.5 text-slate-600">{school.address}</td>,
+                        city: <td className="px-3 py-2.5 text-slate-600">{school.city_name}</td>,
+                        education_admin: <td className="px-3 py-2.5 text-slate-600">{school.education_admin_name}</td>,
+                        phone: (
+                          <td className="px-3 py-2.5 text-slate-600" dir="ltr">
+                            {school.phone}
+                          </td>
+                        ),
+                      })}
                       <td className="whitespace-nowrap px-3 py-2.5 text-end">
                         <button
                           onClick={() => startEdit(school)}

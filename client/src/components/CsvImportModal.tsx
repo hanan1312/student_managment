@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Download, Upload, X, CheckCircle2, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import { parseCsv, readFileAsText, buildCsv, downloadCsv } from "../lib/csv";
 import { isExcelFile, parseExcelFile, downloadExcel } from "../lib/excel";
+import { useColumnOrder } from "../lib/useColumnOrder";
 
 export type ImportColumn = { key: string; label: string; required?: boolean; example?: string; aliases?: string[] };
 
@@ -47,6 +48,9 @@ export default function CsvImportModal<T>({
   const [parseError, setParseError] = useState<string | null>(null);
 
   const baseTemplateName = templateFilename.replace(/\.csv$/i, "");
+  // Preview columns can be dragged into another order (the template keeps its own).
+  const previewOrder = useColumnOrder(`import:${baseTemplateName}`, columns.map((c) => c.key));
+  const previewColumns = previewOrder.order.map((key) => columns.find((c) => c.key === key)!);
 
   const handleDownloadTemplate = (format: "csv" | "xlsx") => {
     const headers = columns.map((c) => c.label);
@@ -236,8 +240,8 @@ export default function CsvImportModal<T>({
                   <thead className="sticky top-0 bg-slate-50 text-start font-semibold uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="px-2.5 py-2">الصف</th>
-                      {columns.map((c) => (
-                        <th key={c.key} className="px-2.5 py-2">
+                      {previewColumns.map((c) => (
+                        <th key={c.key} {...previewOrder.headerProps(c.key)} className="px-2.5 py-2">
                           {c.label}
                         </th>
                       ))}
@@ -248,7 +252,7 @@ export default function CsvImportModal<T>({
                     {rows.map((r) => (
                       <tr key={r.rowNumber} className={r.error ? "bg-red-50/40" : ""}>
                         <td className="px-2.5 py-1.5 text-slate-400">{r.rowNumber}</td>
-                        {columns.map((c) => (
+                        {previewColumns.map((c) => (
                           <td key={c.key} className="max-w-[140px] truncate px-2.5 py-1.5 text-slate-600">
                             {r.raw[c.key] ?? ""}
                           </td>

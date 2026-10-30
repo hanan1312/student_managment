@@ -25,6 +25,7 @@ import UserPermissionsModal from "../components/UserPermissionsModal";
 import CsvImportModal, { type ImportColumn } from "../components/CsvImportModal";
 import ActivityMonitor from "../components/ActivityMonitor";
 import UserCatalogTab from "../components/UserCatalogTab";
+import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
 
 type UsersTab = "users" | "activity" | "cities" | "education-admins";
 
@@ -36,6 +37,17 @@ const TAB_BUTTONS: { key: UsersTab; label: string; icon: typeof ShieldCheck }[] 
 ];
 
 type OutletCtx = { notify: (label: string) => void };
+
+const USER_COLUMN_LABELS = {
+  username: "اسم المستخدم",
+  code: "الكود",
+  full_name: "الاسم بالكامل",
+  role: "الدور",
+  city: "مدينة",
+  education_admin: "إدارة تعليمية",
+  password: "كلمة المرور",
+};
+const USER_COLUMN_KEYS = Object.keys(USER_COLUMN_LABELS) as (keyof typeof USER_COLUMN_LABELS)[];
 
 const USER_IMPORT_COLUMNS: ImportColumn[] = [
   // Arabic headers; the earlier English ones still import.
@@ -61,6 +73,7 @@ export default function UsersPage() {
   const { token, user: me } = useAuth();
 
   const [users, setUsers] = useState<SystemUser[]>([]);
+  const userColumns = useColumnOrder("users", USER_COLUMN_KEYS);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -214,20 +227,18 @@ export default function UsersPage() {
               <table className="min-w-full divide-y divide-slate-100 text-sm font-bold">
                 <thead className="bg-slate-50/95 text-start text-xs font-bold uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-3 py-2.5">اسم المستخدم</th>
-                    <th className="px-3 py-2.5">الكود</th>
-                    <th className="px-3 py-2.5">الاسم بالكامل</th>
-                    <th className="px-3 py-2.5">الدور</th>
-                    <th className="px-3 py-2.5">مدينة</th>
-                    <th className="px-3 py-2.5">إدارة تعليمية</th>
-                    <th className="px-3 py-2.5">كلمة المرور</th>
+                    {userColumns.order.map((key) => (
+                      <th key={key} {...userColumns.headerProps(key)} className="px-3 py-2.5">
+                        {USER_COLUMN_LABELS[key]}
+                      </th>
+                    ))}
                     <th className="px-3 py-2.5 text-end">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-10 text-center text-slate-400">
+                      <td colSpan={USER_COLUMN_KEYS.length + 1} className="px-3 py-10 text-center text-slate-400">
                         جارٍ تحميل المستخدمين…
                       </td>
                     </tr>
@@ -236,46 +247,52 @@ export default function UsersPage() {
                   {!loading &&
                     users.map((u) => (
                       <tr key={u.id} onClick={() => setEditing(u)} className="cursor-pointer hover:bg-slate-50">
-                        <td className="px-3 py-2.5 font-bold text-slate-800">
-                          <div className="flex items-center gap-2">
-                            <UserCircle size={16} className="text-slate-300" />
-                            {u.username}
-                            {u.id === me?.id && (
-                              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600">
-                                أنت
-                              </span>
-                            )}
-                            {Boolean(u.must_change_password) && (
-                              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                                في انتظار أول دخول
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5 font-mono text-slate-500">{u.code}</td>
-                        <td className="px-3 py-2.5 text-slate-600">{u.full_name}</td>
-                        <td className="px-3 py-2.5 text-slate-500">{roleLabel(u.role)}</td>
-                        <td className="px-3 py-2.5 text-slate-500">{u.city_name}</td>
-                        <td className="px-3 py-2.5 text-slate-500">{u.education_admin_name}</td>
-                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => toggleRevealed(u.id)}
-                            title="كلمات المرور مشفرة ولا يمكن عرضها — هذا يُظهر/يُخفي القناع فقط"
-                            className="flex items-center gap-1.5 text-slate-400 hover:text-slate-600"
-                          >
-                            {revealedIds.has(u.id) ? (
-                              <>
-                                <EyeOff size={13} />
-                                <span className="tracking-widest">••••••••</span>
-                              </>
-                            ) : (
-                              <>
-                                <Eye size={13} />
-                                <span className="text-xs text-slate-300">مخفية</span>
-                              </>
-                            )}
-                          </button>
-                        </td>
+                        {orderedCells(userColumns.order, {
+                          username: (
+                            <td className="px-3 py-2.5 font-bold text-slate-800">
+                              <div className="flex items-center gap-2">
+                                <UserCircle size={16} className="text-slate-300" />
+                                {u.username}
+                                {u.id === me?.id && (
+                                  <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600">
+                                    أنت
+                                  </span>
+                                )}
+                                {Boolean(u.must_change_password) && (
+                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                    في انتظار أول دخول
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          ),
+                          code: <td className="px-3 py-2.5 font-mono text-slate-500">{u.code}</td>,
+                          full_name: <td className="px-3 py-2.5 text-slate-600">{u.full_name}</td>,
+                          role: <td className="px-3 py-2.5 text-slate-500">{roleLabel(u.role)}</td>,
+                          city: <td className="px-3 py-2.5 text-slate-500">{u.city_name}</td>,
+                          education_admin: <td className="px-3 py-2.5 text-slate-500">{u.education_admin_name}</td>,
+                          password: (
+                            <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => toggleRevealed(u.id)}
+                                title="كلمات المرور مشفرة ولا يمكن عرضها — هذا يُظهر/يُخفي القناع فقط"
+                                className="flex items-center gap-1.5 text-slate-400 hover:text-slate-600"
+                              >
+                                {revealedIds.has(u.id) ? (
+                                  <>
+                                    <EyeOff size={13} />
+                                    <span className="tracking-widest">••••••••</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye size={13} />
+                                    <span className="text-xs text-slate-300">مخفية</span>
+                                  </>
+                                )}
+                              </button>
+                            </td>
+                          ),
+                        })}
                         <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1">
                             {(me?.role === "admin" || me?.role === "master") && (

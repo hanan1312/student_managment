@@ -4,6 +4,9 @@ import { useAuth } from "../context/AuthContext";
 import { api, ApiError } from "../lib/api";
 import type { UserCatalogItem, UserCatalogKind } from "../lib/types";
 import { inputCls } from "./FormLayout";
+import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
+
+const CATALOG_COLUMN_KEYS = ["code", "name", "comment"] as const;
 
 // Users > مدينة / إدارة تعليمية: a table of entries plus an "add new" row. The two catalogs
 // only differ in what their code column is called.
@@ -15,6 +18,8 @@ const LABELS: Record<UserCatalogKind, { code: string; title: string }> = {
 export default function UserCatalogTab({ kind }: { kind: UserCatalogKind }) {
   const { token } = useAuth();
   const labels = LABELS[kind];
+  const columns = useColumnOrder(`catalog:${kind}`, CATALOG_COLUMN_KEYS);
+  const headerLabels = { code: labels.code, name: "الاسم", comment: "ملاحظات" };
   const [items, setItems] = useState<UserCatalogItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [code, setCode] = useState("");
@@ -95,9 +100,11 @@ export default function UserCatalogTab({ kind }: { kind: UserCatalogKind }) {
         <table className="min-w-full divide-y divide-slate-100 text-sm font-bold">
           <thead className="bg-slate-50/95 text-start text-xs font-bold uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-3 py-2.5">{labels.code}</th>
-              <th className="px-3 py-2.5">الاسم</th>
-              <th className="px-3 py-2.5">ملاحظات</th>
+              {columns.order.map((key) => (
+                <th key={key} {...columns.headerProps(key)} className="px-3 py-2.5">
+                  {headerLabels[key]}
+                </th>
+              ))}
               <th className="px-3 py-2.5" />
             </tr>
           </thead>
@@ -117,9 +124,11 @@ export default function UserCatalogTab({ kind }: { kind: UserCatalogKind }) {
             ) : (
               items.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50">
-                  <td className="px-3 py-2.5 font-bold text-slate-700">{item.code}</td>
-                  <td className="px-3 py-2.5 text-slate-700">{item.name}</td>
-                  <td className="px-3 py-2.5 text-slate-500">{item.comment}</td>
+                  {orderedCells(columns.order, {
+                    code: <td className="px-3 py-2.5 font-bold text-slate-700">{item.code}</td>,
+                    name: <td className="px-3 py-2.5 text-slate-700">{item.name}</td>,
+                    comment: <td className="px-3 py-2.5 text-slate-500">{item.comment}</td>,
+                  })}
                   <td className="px-3 py-2.5 text-end">
                     <button
                       onClick={() => handleDelete(item)}

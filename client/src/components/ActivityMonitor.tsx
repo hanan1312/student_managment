@@ -3,6 +3,21 @@ import { Circle, History } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import type { ActivityLogEntry, PresenceEntry } from "../lib/types";
 import { roleLabel } from "./SystemUserModal";
+import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
+
+const PRESENCE_COLUMNS = {
+  user: "المستخدم",
+  role: "الدور",
+  status: "الحالة",
+  login: "وقت الدخول",
+  session: "مدة الجلسة",
+  idle: "مدة الخمول",
+  logout: "وقت الخروج",
+};
+const PRESENCE_KEYS = Object.keys(PRESENCE_COLUMNS) as (keyof typeof PRESENCE_COLUMNS)[];
+
+const ACTIVITY_COLUMNS = { time: "الوقت", user: "المستخدم", role: "الدور", action: "الإجراء", result: "النتيجة" };
+const ACTIVITY_KEYS = Object.keys(ACTIVITY_COLUMNS) as (keyof typeof ACTIVITY_COLUMNS)[];
 
 const STATUS_LABELS: Record<PresenceEntry["status"], string> = {
   online: "متصل",
@@ -41,6 +56,8 @@ export default function ActivityMonitor({ token }: { token: string }) {
   const [activity, setActivity] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const presenceColumns = useColumnOrder("activity:presence", PRESENCE_KEYS);
+  const activityColumns = useColumnOrder("activity:log", ACTIVITY_KEYS);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,13 +97,11 @@ export default function ActivityMonitor({ token }: { token: string }) {
           <table className="min-w-full divide-y divide-slate-100 text-sm font-bold">
             <thead className="bg-slate-50/95 text-start text-xs font-bold uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-3 py-2.5">المستخدم</th>
-                <th className="px-3 py-2.5">الدور</th>
-                <th className="px-3 py-2.5">الحالة</th>
-                <th className="px-3 py-2.5">وقت الدخول</th>
-                <th className="px-3 py-2.5">مدة الجلسة</th>
-                <th className="px-3 py-2.5">مدة الخمول</th>
-                <th className="px-3 py-2.5">وقت الخروج</th>
+                {presenceColumns.order.map((key) => (
+                  <th key={key} {...presenceColumns.headerProps(key)} className="px-3 py-2.5">
+                    {PRESENCE_COLUMNS[key]}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -107,26 +122,34 @@ export default function ActivityMonitor({ token }: { token: string }) {
               {!loading &&
                 presence.map((p) => (
                   <tr key={p.username} className="hover:bg-slate-50">
-                    <td className="px-3 py-2.5 font-bold text-slate-800">
-                      <div className="flex items-center gap-1.5">
-                        <Circle size={9} className={STATUS_DOT[p.status]} fill="currentColor" />
-                        {p.fullName} <span className="text-slate-400">@{p.username}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-500">{roleLabel(p.role)}</td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[p.status]}`}
-                      >
-                        {STATUS_LABELS[p.status]}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-500">{new Date(p.loginAt).toLocaleString()}</td>
-                    <td className="px-3 py-2.5 text-slate-500">{formatDuration(p.sessionSeconds)}</td>
-                    <td className="px-3 py-2.5 text-slate-500">{formatDuration(p.idleSeconds)}</td>
-                    <td className="px-3 py-2.5 text-slate-500">
-                      {p.offlineAt ? new Date(p.offlineAt).toLocaleString() : "—"}
-                    </td>
+                    {orderedCells(presenceColumns.order, {
+                      user: (
+                        <td className="px-3 py-2.5 font-bold text-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <Circle size={9} className={STATUS_DOT[p.status]} fill="currentColor" />
+                            {p.fullName} <span className="text-slate-400">@{p.username}</span>
+                          </div>
+                        </td>
+                      ),
+                      role: <td className="px-3 py-2.5 text-slate-500">{roleLabel(p.role)}</td>,
+                      status: (
+                        <td className="px-3 py-2.5">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[p.status]}`}
+                          >
+                            {STATUS_LABELS[p.status]}
+                          </span>
+                        </td>
+                      ),
+                      login: <td className="px-3 py-2.5 text-slate-500">{new Date(p.loginAt).toLocaleString()}</td>,
+                      session: <td className="px-3 py-2.5 text-slate-500">{formatDuration(p.sessionSeconds)}</td>,
+                      idle: <td className="px-3 py-2.5 text-slate-500">{formatDuration(p.idleSeconds)}</td>,
+                      logout: (
+                        <td className="px-3 py-2.5 text-slate-500">
+                          {p.offlineAt ? new Date(p.offlineAt).toLocaleString() : "—"}
+                        </td>
+                      ),
+                    })}
                   </tr>
                 ))}
             </tbody>
@@ -143,11 +166,11 @@ export default function ActivityMonitor({ token }: { token: string }) {
           <table className="min-w-full divide-y divide-slate-100 text-sm font-bold">
             <thead className="bg-slate-50/95 text-start text-xs font-bold uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-3 py-2.5">الوقت</th>
-                <th className="px-3 py-2.5">المستخدم</th>
-                <th className="px-3 py-2.5">الدور</th>
-                <th className="px-3 py-2.5">الإجراء</th>
-                <th className="px-3 py-2.5">النتيجة</th>
+                {activityColumns.order.map((key) => (
+                  <th key={key} {...activityColumns.headerProps(key)} className="px-3 py-2.5">
+                    {ACTIVITY_COLUMNS[key]}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -168,24 +191,32 @@ export default function ActivityMonitor({ token }: { token: string }) {
               {!loading &&
                 activity.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50">
-                    <td className="px-3 py-2.5 text-slate-500">{new Date(a.created_at).toLocaleString()}</td>
-                    <td className="px-3 py-2.5 font-bold text-slate-800">
-                      {a.full_name || a.username} <span className="text-slate-400">@{a.username}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-500">{roleLabel(a.role)}</td>
-                    <td className="px-3 py-2.5 text-slate-500">
-                      <span className="me-1.5 font-mono text-xs uppercase text-slate-400">{a.method}</span>
-                      {a.module ?? a.path}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          a.status_code < 400 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
-                        }`}
-                      >
-                        {a.status_code}
-                      </span>
-                    </td>
+                    {orderedCells(activityColumns.order, {
+                      time: <td className="px-3 py-2.5 text-slate-500">{new Date(a.created_at).toLocaleString()}</td>,
+                      user: (
+                        <td className="px-3 py-2.5 font-bold text-slate-800">
+                          {a.full_name || a.username} <span className="text-slate-400">@{a.username}</span>
+                        </td>
+                      ),
+                      role: <td className="px-3 py-2.5 text-slate-500">{roleLabel(a.role)}</td>,
+                      action: (
+                        <td className="px-3 py-2.5 text-slate-500">
+                          <span className="me-1.5 font-mono text-xs uppercase text-slate-400">{a.method}</span>
+                          {a.module ?? a.path}
+                        </td>
+                      ),
+                      result: (
+                        <td className="px-3 py-2.5">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              a.status_code < 400 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
+                            }`}
+                          >
+                            {a.status_code}
+                          </span>
+                        </td>
+                      ),
+                    })}
                   </tr>
                 ))}
             </tbody>

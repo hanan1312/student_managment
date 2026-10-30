@@ -251,3 +251,15 @@ body {
     break-inside: avoid;
   }
 }
+
+/* Draggable table headers (lib/useColumnOrder.ts). */
+th[draggable="true"] {
+  cursor: grab;
+}
+th[data-dragging] {
+  opacity: 0.4;
+}
+th[data-drag-over] {
+  box-shadow: inset 0 -2px 0 0 var(--color-brand-500, #6366f1);
+  background-color: color-mix(in srgb, var(--color-brand-500, #6366f1) 8%, transparent);
+}

@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  cloneElement,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+  type ThHTMLAttributes,
+} from "react";
 import { createPortal } from "react-dom";
 import { ClipboardList, FileText, Printer, Search, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -22,6 +30,7 @@ import type { DegreesOverviewStudent, StudentGrade, SubjectDegrees } from "../li
 import DegreesTablePrintModal from "./DegreesTablePrintModal";
 import StudentCertificateModal, { type CertificateStudent } from "./StudentCertificateModal";
 import StudentDegreesEditor from "./StudentDegreesEditor";
+import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
 
 function matches(s: DegreesOverviewStudent, q: string) {
   if (!q) return true;
@@ -136,6 +145,22 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
     [visibleSubjects, subjectInfo]
   );
   const totalMarks = useMemo(() => sharedTotalMarks(filteredRows.map((r) => r.totals)), [filteredRows]);
+  const columnKeys = useMemo(
+    () => [
+      "name",
+      "national_id",
+      "moe_code",
+      "division",
+      "section",
+      ...inTotal.map((s) => `subject:${s.id}`),
+      "total",
+      ...outside.map((s) => `subject:${s.id}`),
+      "percent",
+      "status",
+    ],
+    [inTotal, outside]
+  );
+  const columns = useColumnOrder("degrees-profile", columnKeys);
 
   // Certificates print for the ticked students that are in the current view.
   const selectedInView = filtered.filter((s) => selectedIds.has(s.id));
@@ -160,7 +185,7 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
   const subjectHeader = (s: SubjectDegrees) => {
     const info = subjectInfo.get(s.id)!;
     return (
-      <th key={s.id} className={`${th} border-s text-center`}>
+      <th key={s.id} {...columns.headerProps(`subject:${s.id}`)} className={`${th} border-s text-center`}>
         {s.name}
         {info.marks && <span className="block text-[10px] font-normal text-slate-400">{info.marks}</span>}
         {info.outside && <span className="block text-[10px] font-normal text-slate-400">خارج المجموع</span>}
@@ -179,6 +204,28 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
       </td>
     );
   const colCount = visibleSubjects.length + 11;
+  const subjectById = new Map(visibleSubjects.map((s) => [s.id, s]));
+  const headers: Record<string, ReactNode> = {
+    name: <th className={`${th} text-start`}>الاسم</th>,
+    national_id: <th className={`${th} text-start`}>الرقم القومي</th>,
+    moe_code: <th className={`${th} text-start`}>كود الحكومة الالكترونية</th>,
+    division: <th className={`${th} text-start`}>المرحلة</th>,
+    section: <th className={`${th} text-start`}>الصف</th>,
+    total: (
+      <th className={`${th} border-s bg-brand-50 text-center text-brand-700`}>
+        مجموع الدرجات
+        {totalMarks && <span className="block text-[10px] font-normal text-brand-600/70">{totalMarks}</span>}
+      </th>
+    ),
+    percent: <th className={`${th} border-s bg-brand-50 text-center text-brand-700`}>%</th>,
+    status: <th className={`${th} border-s text-center`}>الحالة</th>,
+  };
+  // Every header but the checkbox, م and the print button can be dragged to another place.
+  const header = (key: string) => {
+    if (key.startsWith("subject:")) return subjectHeader(subjectById.get(Number(key.slice(8)))!);
+    const el = headers[key] as ReactElement<ThHTMLAttributes<HTMLTableCellElement>>;
+    return cloneElement(el, { key, ...columns.headerProps(key) });
+  };
   const selectCls =
     "rounded-lg border border-white/10 bg-white py-1.5 ps-2 pe-7 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-gold-400/40";
 
@@ -278,19 +325,7 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
                     />
                   </th>
                   <th className={`${th} text-start`}>م</th>
-                  <th className={`${th} text-start`}>الاسم</th>
-                  <th className={`${th} text-start`}>الرقم القومي</th>
-                  <th className={`${th} text-start`}>كود الحكومة الالكترونية</th>
-                  <th className={`${th} text-start`}>المرحلة</th>
-                  <th className={`${th} text-start`}>الصف</th>
-                  {inTotal.map(subjectHeader)}
-                  <th className={`${th} border-s bg-brand-50 text-center text-brand-700`}>
-                    مجموع الدرجات
-                    {totalMarks && <span className="block text-[10px] font-normal text-brand-600/70">{totalMarks}</span>}
-                  </th>
-                  {outside.map(subjectHeader)}
-                  <th className={`${th} border-s bg-brand-50 text-center text-brand-700`}>%</th>
-                  <th className={`${th} border-s text-center`}>الحالة</th>
+                  {columns.order.map(header)}
                   <th className={`${th} border-s`} />
                 </tr>
               </thead>
@@ -329,26 +364,35 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
                           />
                         </td>
                         <td className={`${td} text-slate-400`}>{st.seq_no}</td>
-                        <td className={`${td} text-base text-slate-800`}>{st.name}</td>
-                        <td className={`${td} text-slate-600`}>{st.national_id}</td>
-                        <td className={`${td} text-slate-600`}>{formatMoeCode(st.moe_code)}</td>
-                        <td className={`${td} text-slate-600`}>{st.division}</td>
-                        <td className={`${td} text-slate-600`}>{st.section}</td>
-                        {inTotal.map((s) => subjectCell(s, bySubject.get(s.id)))}
-                        <td className={`${td} border-s bg-brand-50/40 text-center font-bold`}>
-                          {totals.hasScore ? formatDegree(totals.score) : ""}
-                        </td>
-                        {outside.map((s) => subjectCell(s, bySubject.get(s.id)))}
-                        <td className={`${td} border-s bg-brand-50/40 text-center font-bold text-brand-700`}>
-                          {formatPercentage(totals.percentage)}
-                        </td>
-                        <td className={`${td} border-s text-center`}>
-                          {status && (
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${statusBadgeClass(status)}`}>
-                              {status}
-                            </span>
-                          )}
-                        </td>
+                        {orderedCells(columns.order, {
+                          name: <td className={`${td} text-base text-slate-800`}>{st.name}</td>,
+                          national_id: <td className={`${td} text-slate-600`}>{st.national_id}</td>,
+                          moe_code: <td className={`${td} text-slate-600`}>{formatMoeCode(st.moe_code)}</td>,
+                          division: <td className={`${td} text-slate-600`}>{st.division}</td>,
+                          section: <td className={`${td} text-slate-600`}>{st.section}</td>,
+                          ...Object.fromEntries(
+                            visibleSubjects.map((s) => [`subject:${s.id}`, subjectCell(s, bySubject.get(s.id))])
+                          ),
+                          total: (
+                            <td className={`${td} border-s bg-brand-50/40 text-center font-bold`}>
+                              {totals.hasScore ? formatDegree(totals.score) : ""}
+                            </td>
+                          ),
+                          percent: (
+                            <td className={`${td} border-s bg-brand-50/40 text-center font-bold text-brand-700`}>
+                              {formatPercentage(totals.percentage)}
+                            </td>
+                          ),
+                          status: (
+                            <td className={`${td} border-s text-center`}>
+                              {status && (
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${statusBadgeClass(status)}`}>
+                                  {status}
+                                </span>
+                              )}
+                            </td>
+                          ),
+                        })}
                         <td className={`${td} border-s`}>
                           <button
                             onClick={(e) => {

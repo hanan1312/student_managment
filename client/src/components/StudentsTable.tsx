@@ -11,8 +11,10 @@ import {
   type StudentColumnKey,
 } from "../lib/studentColumns";
 import { passStatus, statusBadgeClass } from "../lib/degrees";
+import { useColumnOrder } from "../lib/useColumnOrder";
 
 const COLUMN_MAP = new Map(STUDENT_COLUMNS.map((c) => [c.key, c]));
+const ALL_COLUMN_KEYS = STUDENT_COLUMNS.map((c) => c.key);
 
 const DATE_COLUMNS = new Set<StudentColumnKey>(["birthday", "admission_date", "status_date"]);
 const RTL_COLUMNS = new Set<StudentColumnKey>([
@@ -280,7 +282,12 @@ export default function StudentsTable({ students, loading, onEdit, onDeleteMany,
   }, [openFilterKey]);
 
   const visibleSet = useMemo(() => new Set(visibleKeys), [visibleKeys]);
-  const orderedVisible = useMemo(() => STUDENT_COLUMNS.filter((c) => visibleSet.has(c.key)), [visibleSet]);
+  // Headers can be dragged to reorder the columns (hidden ones keep their place too).
+  const columnOrder = useColumnOrder("students", ALL_COLUMN_KEYS);
+  const orderedVisible = useMemo(
+    () => columnOrder.order.filter((k) => visibleSet.has(k)).map((k) => COLUMN_MAP.get(k)!),
+    [columnOrder.order, visibleSet]
+  );
 
   const filteredStudents = useMemo(() => {
     const activeFilters = Object.entries(columnFilters) as [StudentColumnKey, Set<string>][];
@@ -390,6 +397,7 @@ export default function StudentsTable({ students, loading, onEdit, onDeleteMany,
   const resetColumns = () => {
     setVisibleKeys(DEFAULT_VISIBLE_COLUMNS);
     setColumnFilters({});
+    columnOrder.reset();
   };
 
   const handleHeaderClick = (key: StudentColumnKey, e: MouseEvent<HTMLButtonElement>) => {
@@ -529,7 +537,7 @@ export default function StudentsTable({ students, loading, onEdit, onDeleteMany,
               {orderedVisible.map((col) => {
                 const hasFilter = Boolean(columnFilters[col.key]);
                 return (
-                  <th key={col.key} className="whitespace-nowrap px-3 py-2.5">
+                  <th key={col.key} {...columnOrder.headerProps(col.key)} className="whitespace-nowrap px-3 py-2.5">
                     <button
                       type="button"
                       data-col-filter-trigger

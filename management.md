@@ -21,6 +21,12 @@ Visible today:
 
 The whole interface is in **Arabic** and laid out **right-to-left**.
 
+**Moving table columns (optional):** in the app's tables (not print previews or the per-student
+degrees editor), drag a column's header onto another header to
+move that column there. Nothing changes until someone drags. The order is remembered per table in
+that browser. The students table's **استعادة الافتراضي** also puts its columns back in their
+default order. Selection checkboxes, row numbers (م) and action buttons stay where they are.
+
 ---
 
 ## 2. Students
@@ -417,6 +423,7 @@ Clean-ups:
 | `client/src/components/PrintParts.tsx` | Shared print-preview pieces (modal, logo/date header, layout options, column and row controls) used by the Students print, the Degrees table print and certificates |
 | `client/src/components/DegreesTablePrintModal.tsx` | ملف الدرجات → طباعة الكل |
 | `client/src/lib/studentAge.ts` | Age on 1 October |
+| `client/src/lib/useColumnOrder.ts` | Drag-to-reorder table columns (`useColumnOrder`, `orderedCells`); saved in `localStorage` as `column_order:<table>`; drag styles in `index.css` |
 | `client/src/components/ClassTree.tsx` | Nested tree; drag mode (`ArrangeContext`, `useArrangeRow`) |
 | `client/src/context/ClassesContext.tsx` | Selection by `levelId`, `levelAndDescendants`, `positionOptions` |
 | `client/src/components/timetable/SubjectSetupModal.tsx` | Per-section marks, خارج, اختياري badge |

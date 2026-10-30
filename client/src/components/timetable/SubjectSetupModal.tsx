@@ -6,6 +6,10 @@ import { useHrEmployees } from "../../context/HrEmployeesContext";
 import { api, ApiError } from "../../lib/api";
 import type { ClassStage, Subject } from "../../lib/types";
 import { autoMaxFromMin } from "../../lib/degrees";
+import { useColumnOrder, orderedCells } from "../../lib/useColumnOrder";
+
+const SUBJECT_COLUMNS = { name: "المادة", level: "الصف", max: "كبرى", min: "صغرى", price: "السعر", category: "التصنيف" };
+const SUBJECT_COLUMN_KEYS = Object.keys(SUBJECT_COLUMNS) as (keyof typeof SUBJECT_COLUMNS)[];
 
 type FlatLevel = { id: number; level: string; stage: string };
 
@@ -89,6 +93,7 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
   const levelListRef = useRef<HTMLDivElement>(null);
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const subjectColumns = useColumnOrder("subjects", SUBJECT_COLUMN_KEYS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -487,12 +492,11 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
               <thead className="bg-slate-50 text-start text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">المادة</th>
-                  <th className="px-3 py-2">الصف</th>
-                  <th className="px-3 py-2">كبرى</th>
-                  <th className="px-3 py-2">صغرى</th>
-                  <th className="px-3 py-2">السعر</th>
-                  <th className="px-3 py-2">التصنيف</th>
+                  {subjectColumns.order.map((key) => (
+                    <th key={key} {...subjectColumns.headerProps(key)} className="px-3 py-2">
+                      {SUBJECT_COLUMNS[key]}
+                    </th>
+                  ))}
                   <th className="px-3 py-2 text-end">الإجراءات</th>
                 </tr>
               </thead>
@@ -515,21 +519,27 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
                   subjects.map((s, i) => (
                     <tr key={s.id} className="hover:bg-slate-50">
                       <td className="px-3 py-2 text-slate-500">{i + 1}</td>
-                      <td className="px-3 py-2 font-medium text-slate-800">
-                        <span className="me-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: s.color ?? "#94a3b8" }} />
-                        {s.name}
-                      </td>
-                      <td className="px-3 py-2 text-slate-500" dir="rtl">
-                        {s.level_ids.length === 0
-                          ? "—"
-                          : s.level_ids.length === 1
-                          ? levelName(s.level_ids[0])
-                          : `${s.level_ids.length} صفوف`}
-                      </td>
-                      <td className="px-3 py-2 text-slate-500">{marksSummary(s, "max_degree")}</td>
-                      <td className="px-3 py-2 text-slate-500">{marksSummary(s, "min_degree")}</td>
-                      <td className="px-3 py-2 text-slate-500">{s.price}</td>
-                      <td className="px-3 py-2 text-slate-500">{s.category || "—"}</td>
+                      {orderedCells(subjectColumns.order, {
+                        name: (
+                          <td className="px-3 py-2 font-medium text-slate-800">
+                            <span className="me-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: s.color ?? "#94a3b8" }} />
+                            {s.name}
+                          </td>
+                        ),
+                        level: (
+                          <td className="px-3 py-2 text-slate-500" dir="rtl">
+                            {s.level_ids.length === 0
+                              ? "—"
+                              : s.level_ids.length === 1
+                              ? levelName(s.level_ids[0])
+                              : `${s.level_ids.length} صفوف`}
+                          </td>
+                        ),
+                        max: <td className="px-3 py-2 text-slate-500">{marksSummary(s, "max_degree")}</td>,
+                        min: <td className="px-3 py-2 text-slate-500">{marksSummary(s, "min_degree")}</td>,
+                        price: <td className="px-3 py-2 text-slate-500">{s.price}</td>,
+                        category: <td className="px-3 py-2 text-slate-500">{s.category || "—"}</td>,
+                      })}
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-1">
                           <button onClick={() => startEdit(s)} className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600">
