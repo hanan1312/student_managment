@@ -1,8 +1,9 @@
-// Age is measured on 1 October of the academic year's first calendar year (the "2026" of the
-// Preferences "Academic year" setting "2026 / 2027"), falling back to the current year.
+// Age is measured on 1 October of the year after the academic year's first year: the "2027" of
+// the Preferences "Academic year" setting "2026 / 2027" (also for "2026" alone). Without a set
+// year, the year after the current one.
 export function ageReferenceDate(academicYear: string | undefined): Date {
   const year = Number(academicYear?.match(/\d{4}/)?.[0]) || new Date().getFullYear();
-  return new Date(year, 9, 1);
+  return new Date(year + 1, 9, 1);
 }
 
 export function ageOn(birthday: string, ref: Date): string {

@@ -43,9 +43,9 @@ default order. Selection checkboxes, row numbers (م) and action buttons stay wh
 | الديانة | مسلم / مسيحي |
 | نوع القيد | مستجد / غير مستجد |
 | الجنسية | Free text, with suggestions (مصري، سوداني، …). Also a table column, in Import and Export |
-| الرقم القومي | |
+| الرقم القومي | A full 14-digit ID fills in تاريخ الميلاد (see below) |
 | كود الحكومة الالكترونية | Was "كود الوزارة". Import still accepts files with the old header |
-| تاريخ الميلاد | |
+| تاريخ الميلاد | Filled in from الرقم القومي; can still be changed by hand |
 | السن في ١ أكتوبر | Calculated automatically (see below) |
 
 **بيانات القبول**
@@ -56,9 +56,19 @@ default order. Selection checkboxes, row numbers (م) and action buttons stay wh
 | المرحلة / الصف | Filled in from التسكين; not typed |
 | المدرسة | Chosen from the schools added in **إضافة مدرسة** (see below). An older typed-in value stays selectable |
 
-**Age rule:** age is shown in years, months and days on **1 October** of the first year of the
-academic year set in Preferences. For example, with "2026 / 2027" the age is worked out on
-1 October 2026.
+**Age rule:** age is shown in years, months and days on **1 October** of the year after the first
+year of the academic year set in Preferences. For example, with "2026 / 2027" the age is worked out
+on 1 October 2027.
+
+**Birth date from الرقم القومي:** the first 7 digits of a 14-digit ID are the birth date: century
+(2 = 1900s, 3 = 2000s), year, month, day. For example `28812131900228` → 13 December 1988
+(2 → 1900, + 88 = 1988, month 12, day 13).
+
+- Typing or pasting a full ID in the student form fills in تاريخ الميلاد. It can then be edited;
+  changing the ID again fills it in again.
+- On **Import**, a row with no تاريخ الميلاد gets it from its الرقم القومي.
+- An ID that isn't 14 digits, or doesn't hold a real date (e.g. month 45), is ignored.
+- Existing students were not changed.
 
 ### Schools (إضافة مدرسة)
 

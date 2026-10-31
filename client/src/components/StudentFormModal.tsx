@@ -33,6 +33,7 @@ import type { ClassStage, FeeType, Payment, Student, StudentInput } from "../lib
 import { genderLabel } from "../lib/studentColumns";
 import { SHOW_EXTENDED_FEATURES } from "../lib/features";
 import { ageOn, ageReferenceDate } from "../lib/studentAge";
+import { birthdayFromNationalId } from "../lib/nationalId";
 import StudentDegreesEditor from "./StudentDegreesEditor";
 import { studentDisplayId } from "../lib/studentId";
 import { Section, Field, inputCls, disabledInputCls } from "./FormLayout";
@@ -726,7 +727,16 @@ export default function StudentFormModal({ tree, initial, onClose, onSubmit }: P
                     </datalist>
                   </Field>
                   <Field label="الرقم القومي">
-                    <input value={values.nationalId} onChange={setField("nationalId")} className={inputCls} />
+                    <input
+                      value={values.nationalId}
+                      onChange={(e) => {
+                        // A full national ID fills in تاريخ الميلاد, which can still be changed by hand.
+                        const nationalId = e.target.value;
+                        const birthday = birthdayFromNationalId(nationalId);
+                        setValues((v) => ({ ...v, nationalId, ...(birthday ? { birthday } : {}) }));
+                      }}
+                      className={inputCls}
+                    />
                   </Field>
                   <Field label="كود الحكومة الالكترونية">
                     <input value={values.moeCode} onChange={setField("moeCode")} className={inputCls} />

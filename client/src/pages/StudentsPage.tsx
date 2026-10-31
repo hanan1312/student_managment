@@ -31,6 +31,7 @@ import { SHOW_EXTENDED_FEATURES } from "../lib/features";
 import { useUiControl } from "../lib/uiControl";
 import { passStatus } from "../lib/degrees";
 import { ageOn, ageReferenceDate } from "../lib/studentAge";
+import { birthdayFromNationalId } from "../lib/nationalId";
 import { useSettings } from "../context/SettingsContext";
 import type { AdmissionInput, ClassStage, FeeType, PaymentInput, Student, StudentInput } from "../lib/types";
 import StudentFormModal from "../components/StudentFormModal";
@@ -306,7 +307,8 @@ export default function StudentsPage() {
         nationalId: raw.nationalId || undefined,
         moeCode: raw.moeCode || undefined,
         address: raw.address || undefined,
-        birthday: toIsoDate(raw.birthday),
+        // An empty birth date is read from the national ID when it holds one.
+        birthday: toIsoDate(raw.birthday) ?? (birthdayFromNationalId(raw.nationalId ?? "") || undefined),
         category: raw.category || undefined,
         school: raw.school || undefined,
         religion: normalizeReligion(raw.religion),
