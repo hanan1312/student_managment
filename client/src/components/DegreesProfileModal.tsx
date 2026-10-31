@@ -62,10 +62,18 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
   const [students, setStudents] = useState<DegreesOverviewStudent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { tree } = useClasses();
+  const { tree, selection } = useClasses();
   const [query, setQuery] = useState("");
   // المراحل filter: a whole stage ("s:<id>") or any item in it, with what's nested under it ("l:<id>").
-  const [scope, setScope] = useState("");
+  // It starts on what's selected in the الهيكل tree.
+  const [scope, setScope] = useState(() => {
+    if (selection.type === "level") return `l:${selection.levelId}`;
+    if (selection.type === "stage") {
+      const stage = tree.find((s) => s.stage === selection.stage);
+      return stage ? `s:${stage.id}` : "";
+    }
+    return "";
+  });
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [printingCertificates, setPrintingCertificates] = useState<CertificateStudent[] | null>(null);
@@ -126,19 +134,24 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
     [rows, scopeInfo, statusFilter, query]
   );
   const filtered = useMemo(() => filteredRows.map((r) => r.student), [filteredRows]);
+  // The subject columns are the subjects linked (in المواد) to the sections of the students shown,
+  // so e.g. a stage whose students are all in one track gets only that track's subjects. With no
+  // placed student in view, the subjects of the chosen part of the tree.
+  const columnLevelIds = useMemo(() => {
+    const placed = new Set(filtered.flatMap((s) => (s.level_id === null ? [] : [s.level_id])));
+    return placed.size > 0 ? placed : scopeInfo.levelIds;
+  }, [filtered, scopeInfo]);
   const visibleSubjects = useMemo(
     () =>
-      scopeInfo.levelIds
-        ? subjects.filter((s) => s.level_marks.some((m) => scopeInfo.levelIds!.has(m.level_id)))
-        : subjects,
-    [subjects, scopeInfo]
+      columnLevelIds ? subjects.filter((s) => s.level_marks.some((m) => columnLevelIds.has(m.level_id))) : subjects,
+    [subjects, columnLevelIds]
   );
   // Per subject over the sections in view: its marks (صغرى / كبرى, when the same everywhere) and
   // whether it's خارج المجموع. Subjects in the total come first, then مجموع الدرجات, then the
   // subjects خارج المجموع.
   const subjectInfo = useMemo(
-    () => new Map(visibleSubjects.map((s) => [s.id, subjectInScope(s, scopeInfo.levelIds)])),
-    [visibleSubjects, scopeInfo]
+    () => new Map(visibleSubjects.map((s) => [s.id, subjectInScope(s, columnLevelIds)])),
+    [visibleSubjects, columnLevelIds]
   );
   const { inTotal, outside } = useMemo(
     () => splitByOutside(visibleSubjects, (s) => subjectInfo.get(s.id)!.outside),
@@ -448,7 +461,7 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
         <DegreesTablePrintModal
           students={filtered}
           subjects={visibleSubjects}
-          scopeLevelIds={scopeInfo.levelIds}
+          scopeLevelIds={columnLevelIds}
           scopeLabel={[
             scopeInfo.label,
             statusFilter ? STATUS_FILTER_LABELS[statusFilter] : null,

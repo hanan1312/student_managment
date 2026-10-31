@@ -347,8 +347,11 @@ function studentGrades(studentId: number, levelId: number | null): GradeRow[] {
       )
       .all(...(byLevel ? [levelId, studentId] : [studentId])) as GradeRow[];
 
-  const rows = levelId ? select(true) : [];
-  return rows.length > 0 ? rows : select(false);
+  // A student with no placement gets every subject. A placed student gets their section's subjects;
+  // if none are linked to it in المواد, only the subjects they already have a degree in.
+  if (!levelId) return select(false);
+  const rows = select(true);
+  return rows.length > 0 ? rows : select(false).filter((g) => g.score !== null || g.score_min !== null);
 }
 
 // مجموع الدرجات = the student's degrees; النسبة المئوية = مجموع الدرجات ÷ مجموع النهايات الكبرى × 100.

@@ -222,6 +222,10 @@ On the student's **ملف الدرجات** tab, or by clicking a student's row i
 الحالة is a column in the Students table (filter it from the column header), in Export and in
 the Students print, and is shown in ملف الدرجات and on certificates.
 
+A placed student whose section has no subjects in المواد (e.g. رياض اطفال) shows only the subjects
+they already have a degree in, instead of every subject. A student with no placement still gets
+every subject.
+
 ### Marks are frozen on saved degrees
 
 When a degree is saved, the section's marks at that moment are stored with it. Changing a
@@ -238,8 +242,12 @@ Changing the degree itself picks up the section's current marks.
   when they are the same for every student shown.
 - A subject marked خارج المجموع in a section is not added to مجموع الدرجات or the percentage.
 - **Filters:**
-  - **المراحل:** a whole stage, or any item in the tree with everything under it. Only the subjects
-    of the chosen part are shown.
+  - **المراحل:** a whole stage, or any item in the tree with everything under it. It starts on what's
+    selected in the الهيكل tree.
+  - **Subject columns:** only the subjects linked in **المواد** to the sections of the students shown
+    (after all filters). A stage whose students are all in one track shows only that track's
+    subjects, which keeps the printout narrow. With no placed student shown, the subjects of the
+    chosen part of the tree.
   - **الحالة:** ناجح، راسب، or بدون درجات.
   - **Search** by name, national ID, كود الحكومة الالكترونية, division, section or school.
 - **Click a row** to edit that student's degrees.
