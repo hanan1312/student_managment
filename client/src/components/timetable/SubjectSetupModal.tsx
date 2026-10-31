@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, BookMarked, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { levelAndDescendants, useClasses } from "../../context/ClassesContext";
@@ -7,6 +8,10 @@ import { api, ApiError } from "../../lib/api";
 import type { ClassStage, Subject } from "../../lib/types";
 import { autoMaxFromMin } from "../../lib/degrees";
 import { useColumnOrder, orderedCells } from "../../lib/useColumnOrder";
+import { downloadExcel } from "../../lib/excel";
+import { isYes, sameName, toNumber } from "../../lib/importValues";
+import CsvImportModal, { type ImportColumn } from "../CsvImportModal";
+import ImportExportButtons from "../ImportExportButtons";
 
 const SUBJECT_COLUMNS = { name: "المادة", level: "الصف", max: "كبرى", min: "صغرى", price: "السعر", category: "التصنيف" };
 const SUBJECT_COLUMN_KEYS = Object.keys(SUBJECT_COLUMNS) as (keyof typeof SUBJECT_COLUMNS)[];
@@ -57,6 +62,30 @@ function pickerRows(tree: ClassStage[]): PickerRow[] {
     ),
   ]);
 }
+
+// Import / Export: one row per subject and section (a subject with no section: one row without
+// one). Importing adds the subject if its name is new and links it to the row's section with
+// the row's marks; the subject's other sections are kept. Empty marks keep what the section had.
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: "name", label: "المادة", required: true, example: "اللغة العربية", aliases: ["اسم المادة", "Subject"] },
+  { key: "stage", label: "المرحلة", example: "المرحلة الابتدائية", aliases: ["Stage"] },
+  { key: "level", label: "الصف", example: "أولى ابتدائى", aliases: ["القسم", "Section"] },
+  { key: "max", label: "النهاية الكبرى", example: "100", aliases: ["كبرى"] },
+  { key: "min", label: "النهاية الصغرى", example: "50", aliases: ["صغرى"] },
+  { key: "outside", label: "خارج المجموع", example: "لا" },
+];
+
+type SubjectImport = {
+  name: string;
+  levelId: number | null;
+  max: number | null;
+  min: number | null;
+  // undefined: the cell was empty, keep what the section had.
+  outside?: boolean;
+};
+
+// "الصف الثاني / البكالوريا" and "الصف الثاني/البكالوريا" are the same path.
+const samePath = (a: string, b: string) => sameName(a.replace(/\s*\/\s*/g, "/"), b.replace(/\s*\/\s*/g, "/"));
 
 const emptyForm = {
   name: "",
@@ -258,6 +287,87 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
   };
 
   const levelName = (id: number) => levels.find((l) => l.id === id)?.level ?? "—";
+  const [importOpen, setImportOpen] = useState(false);
+
+  const handleExport = () => {
+    const [name, stage, level, max, min, out] = IMPORT_COLUMNS.map((c) => c.label);
+    const rowsOut = subjects.flatMap((s) =>
+      s.level_marks.length === 0
+        ? [{ [name]: s.name, [stage]: "", [level]: "", [max]: "", [min]: "", [out]: "" }]
+        : s.level_marks.map((m) => {
+            const lvl = levels.find((l) => l.id === m.level_id);
+            return {
+              [name]: s.name,
+              [stage]: lvl?.stage ?? "",
+              [level]: lvl?.level ?? "",
+              [max]: m.max_degree ?? "",
+              [min]: m.min_degree ?? "",
+              [out]: m.outside_total ? "نعم" : "لا",
+            };
+          })
+    );
+    downloadExcel("subjects.xlsx", IMPORT_COLUMNS.map((c) => c.label), rowsOut);
+  };
+
+  const mapImportRow = (raw: Record<string, string>): { input?: SubjectImport; error?: string; warning?: string } => {
+    let levelId: number | null = null;
+    if (raw.level?.trim()) {
+      const matches = levels.filter((l) => samePath(l.level, raw.level) && (!raw.stage?.trim() || sameName(l.stage, raw.stage)));
+      if (matches.length === 0) return { error: `الصف "${raw.level.trim()}" غير موجود في الهيكل (أو ليس آخر فرع)` };
+      if (matches.length > 1) return { error: `الصف "${raw.level.trim()}" موجود في أكثر من مرحلة: اكتب المرحلة` };
+      levelId = matches[0].id;
+    }
+    const min = toNumber(raw.min);
+    let max = toNumber(raw.max);
+    if ((raw.max?.trim() && max === null) || (raw.min?.trim() && min === null)) return { error: "النهايات يجب أن تكون أرقامًا" };
+    // Same rule as the form: a صغرى alone makes the كبرى double it.
+    if (max === null && min !== null) max = min * 2;
+    if (max !== null && min !== null && min > max) return { error: "النهاية الصغرى أكبر من الكبرى" };
+    const existing = subjects.find((s) => sameName(s.name, raw.name));
+    if (existing && levelId === null) return { error: "المادة موجودة: اكتب الصف لربطها به" };
+    return {
+      input: {
+        name: raw.name.trim(),
+        levelId,
+        max,
+        min,
+        outside: raw.outside?.trim() ? isYes(raw.outside) : undefined,
+      },
+      warning: existing ? "مادة موجودة: سيُضاف الصف أو تُحدَّث نهاياته" : "مادة جديدة",
+    };
+  };
+
+  // Rows run one after another; each reads the subjects again so a subject added by an earlier
+  // row of the file is found.
+  const importRow = async (input: SubjectImport) => {
+    if (!token) return;
+    const { subjects: current } = await api.getSubjects(token);
+    const existing = current.find((s) => sameName(s.name, input.name));
+    const prev = existing?.level_marks.find((m) => m.level_id === input.levelId);
+    const levelMarks =
+      input.levelId === null
+        ? []
+        : [
+            {
+              levelId: input.levelId,
+              maxDegree: input.max ?? prev?.max_degree ?? null,
+              minDegree: input.min ?? prev?.min_degree ?? null,
+              outsideTotal: input.outside,
+            },
+          ];
+    if (!existing) {
+      await api.createSubject(token, {
+        name: input.name,
+        levelIds: input.levelId === null ? [] : [input.levelId],
+        levelMarks,
+      });
+    } else if (input.levelId !== null) {
+      await api.updateSubject(token, existing.id, {
+        levelIds: [...new Set([...existing.level_ids, input.levelId])],
+        levelMarks,
+      });
+    }
+  };
 
   return (
     <div className="animate-fade-in fixed inset-0 z-30 flex items-center justify-center bg-ink-950/60 p-4 backdrop-blur-sm">
@@ -267,9 +377,12 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
             <BookMarked size={18} className="text-brand-600" />
             <h2 className="text-base font-semibold text-slate-800">إعداد المواد</h2>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <ImportExportButtons onImport={() => setImportOpen(true)} onExport={handleExport} exportDisabled={subjects.length === 0} />
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div ref={bodyRef} className="flex-1 overflow-y-auto px-5 py-4">
@@ -566,6 +679,21 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
           </button>
         </div>
       </div>
+
+      {importOpen &&
+        createPortal(
+          <CsvImportModal<SubjectImport>
+            title="استيراد المواد"
+            description="صف لكل مادة وصف دراسي. المادة الجديدة تُضاف، والموجودة يُضاف لها الصف أو تُحدَّث نهاياته، وتبقى صفوفها الأخرى كما هي. الخانات الفارغة لا تغيّر النهايات. خارج المجموع: نعم / لا."
+            templateFilename="subjects-template.csv"
+            columns={IMPORT_COLUMNS}
+            mapRow={mapImportRow}
+            onImportRow={importRow}
+            onClose={() => setImportOpen(false)}
+            onFinished={load}
+          />,
+          document.body
+        )}
     </div>
   );
 }

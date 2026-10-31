@@ -4,7 +4,16 @@ import { parseCsv, readFileAsText, buildCsv, downloadCsv } from "../lib/csv";
 import { isExcelFile, parseExcelFile, downloadExcel } from "../lib/excel";
 import { useColumnOrder } from "../lib/useColumnOrder";
 
-export type ImportColumn = { key: string; label: string; required?: boolean; example?: string; aliases?: string[] };
+export type ImportColumn = {
+  key: string;
+  label: string;
+  required?: boolean;
+  example?: string;
+  aliases?: string[];
+  // Read when the file has it, but left out of the template and the expected-columns list (e.g.
+  // subjects of other stages).
+  hidden?: boolean;
+};
 
 export type MappedRow<T> = { rowNumber: number; raw: Record<string, string>; input?: T; error?: string; warning?: string };
 
@@ -50,12 +59,16 @@ export default function CsvImportModal<T>({
   const baseTemplateName = templateFilename.replace(/\.csv$/i, "");
   // Preview columns can be dragged into another order (the template keeps its own).
   const previewOrder = useColumnOrder(`import:${baseTemplateName}`, columns.map((c) => c.key));
-  const previewColumns = previewOrder.order.map((key) => columns.find((c) => c.key === key)!);
+  // The preview shows the columns the file fills (all of them before a file is read).
+  const previewColumns = previewOrder.order
+    .map((key) => columns.find((c) => c.key === key)!)
+    .filter((c) => rows.length === 0 || rows.some((r) => r.raw[c.key]?.trim()));
+  const templateColumns = columns.filter((c) => !c.hidden);
 
   const handleDownloadTemplate = (format: "csv" | "xlsx") => {
-    const headers = columns.map((c) => c.label);
+    const headers = templateColumns.map((c) => c.label);
     const sample: Record<string, string> = {};
-    columns.forEach((c) => {
+    templateColumns.forEach((c) => {
       sample[c.label] = c.example ?? "";
     });
     if (format === "xlsx") {
@@ -184,7 +197,7 @@ export default function CsvImportModal<T>({
               <div>
                 <p className="mb-1.5 text-xs font-medium text-slate-500">الأعمدة المتوقعة</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {columns.map((c) => (
+                  {templateColumns.map((c) => (
                     <span
                       key={c.key}
                       className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${

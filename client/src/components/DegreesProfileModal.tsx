@@ -32,6 +32,10 @@ import { useSettings } from "../context/SettingsContext";
 import { DEGREES_INFO_FIELDS } from "../lib/degreesColumns";
 import { ageReferenceDate } from "../lib/studentAge";
 import ManageColumnsModal from "./ManageColumnsModal";
+import CsvImportModal, { type ImportColumn } from "./CsvImportModal";
+import ImportExportButtons from "./ImportExportButtons";
+import { downloadExcel } from "../lib/excel";
+import { sameName, toNumber } from "../lib/importValues";
 import StudentCertificateModal, { type CertificateStudent } from "./StudentCertificateModal";
 import StudentDegreesEditor from "./StudentDegreesEditor";
 import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
@@ -86,6 +90,28 @@ const COLUMN_LABELS: Record<string, string> = {
 const toPrintKey = (key: string) =>
   key.startsWith("subject:") ? `subject-${key.slice(8)}` : key === "total" ? "score" : key === "percent" ? "percentage" : key;
 
+// Imported degrees: one student's row. Students are found by الرقم القومي, then كود الحكومة
+// الالكترونية, then their name (when only one student has it).
+type DegreesImport = { studentId: number; grades: { subjectId: number; score: number }[] };
+
+const digits = (v: string | null | undefined) => (v ?? "").replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/\D/g, "");
+
+function findStudent(students: DegreesOverviewStudent[], raw: Record<string, string>) {
+  const nationalId = digits(raw.national_id);
+  if (nationalId) {
+    const found = students.find((s) => digits(s.national_id) === nationalId);
+    if (found) return found;
+  }
+  const moeCode = digits(raw.moe_code);
+  if (moeCode) {
+    const found = students.find((s) => digits(s.moe_code) === moeCode);
+    if (found) return found;
+  }
+  const byName = students.filter((s) => sameName(s.name, raw.name));
+  if (byName.length > 1) return `${byName.length} طلاب بهذا الاسم: اكتب الرقم القومي أو كود الحكومة الالكترونية`;
+  return byName[0] ?? null;
+}
+
 export default function DegreesProfileModal({ onClose }: { onClose: () => void }) {
   const { token } = useAuth();
   const [subjects, setSubjects] = useState<SubjectDegrees[]>([]);
@@ -113,6 +139,7 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
   const ageRef = ageReferenceDate(settings.academic_year);
   const [switchedColumns, setSwitchedColumns] = useState<Set<string>>(loadHiddenColumns);
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -278,6 +305,73 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
     const el = headers[key] as ReactElement<ThHTMLAttributes<HTMLTableCellElement>>;
     return cloneElement(el, { key, ...columns.headerProps(key) });
   };
+  // تصدير: the table as shown (its rows, columns and column order) to Excel.
+  const columnLabel = (key: string) =>
+    key.startsWith("subject:") ? subjectById.get(Number(key.slice(8)))?.name ?? key : COLUMN_LABELS[key] ?? key;
+  const handleExport = () => {
+    const infoByKey = new Map(DEGREES_INFO_FIELDS.map((f) => [f.key, f]));
+    const cell = (key: string, st: DegreesOverviewStudent, totals: (typeof filteredRows)[number]["totals"]) => {
+      const info = infoByKey.get(key);
+      if (info) return info.get(st, ageRef);
+      if (key.startsWith("subject:")) {
+        const g = st.grades.find((x) => x.subject_id === Number(key.slice(8)));
+        return g?.score ?? "";
+      }
+      if (key === "total") return totals.hasScore ? totals.score : "";
+      if (key === "percent") return formatPercentage(totals.percentage);
+      if (key === "status") return passStatus(totals.percentage) ?? "";
+      return "";
+    };
+    downloadExcel(
+      "degrees.xlsx",
+      columns.order.map(columnLabel),
+      filteredRows.map(({ student, totals }) =>
+        Object.fromEntries(columns.order.map((key) => [columnLabel(key), cell(key, student, totals)]))
+      )
+    );
+  };
+
+  // استيراد: the identifying columns plus one column per subject (by its name). Other columns,
+  // e.g. the totals of an exported file, are ignored.
+  // The template lists the subjects shown; the others are still read when the file has them.
+  const templateSubjects = visibleSubjects.length > 0 ? visibleSubjects : subjects;
+  const importColumns: ImportColumn[] = [
+    { key: "national_id", label: "الرقم القومي", example: "28812131900228", aliases: ["National ID"] },
+    { key: "moe_code", label: "كود الحكومة الالكترونية", aliases: ["كود الوزارة"] },
+    { key: "name", label: "الاسم", example: "اسم الطالب", aliases: ["اسم الطالب", "Name"] },
+    ...subjects.map((s) => ({ key: `subject:${s.id}`, label: s.name, hidden: !templateSubjects.includes(s) })),
+  ];
+  const mapImportRow = (raw: Record<string, string>): { input?: DegreesImport; error?: string; warning?: string } => {
+    const student = findStudent(students, raw);
+    if (typeof student === "string") return { error: student };
+    if (!student) return { error: "الطالب غير موجود (بالرقم القومي أو كود الحكومة أو الاسم)" };
+    const grades: DegreesImport["grades"] = [];
+    const skipped: string[] = [];
+    for (const [key, value] of Object.entries(raw)) {
+      if (!key.startsWith("subject:") || !value.trim() || /^[-—–]+$/.test(value.trim())) continue;
+      const subjectId = Number(key.slice(8));
+      const name = subjects.find((s) => s.id === subjectId)?.name ?? "";
+      const score = toNumber(value);
+      if (score === null || score < 0) return { error: `${name}: "${value}" ليست درجة صحيحة` };
+      const grade = student.grades.find((g) => g.subject_id === subjectId);
+      if (!grade) {
+        skipped.push(name);
+        continue;
+      }
+      if (grade.max_degree !== null && score > grade.max_degree) {
+        return { error: `${name}: ${score} أكبر من النهاية الكبرى (${grade.max_degree})` };
+      }
+      grades.push({ subjectId, score });
+    }
+    if (grades.length === 0) return { error: "لا توجد درجات لمواد هذا الطالب" };
+    return {
+      input: { studentId: student.id, grades },
+      warning: [`${student.name}`, skipped.length ? `مواد ليست لصفه تُركت: ${skipped.join("، ")}` : null]
+        .filter(Boolean)
+        .join(" · "),
+    };
+  };
+
   const selectCls =
     "rounded-lg border border-white/10 bg-white py-1.5 ps-2 pe-7 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-gold-400/40";
 
@@ -342,6 +436,12 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
                 طباعة الشهادات ({selectedInView.length})
               </button>
             )}
+            <ImportExportButtons
+              tone="dark"
+              onImport={() => setImportOpen(true)}
+              onExport={handleExport}
+              exportDisabled={filtered.length === 0}
+            />
             <button
               onClick={() => setManageColumnsOpen(true)}
               className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
@@ -500,6 +600,29 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
               </div>
             </div>
           </div>,
+          document.body
+        )}
+
+      {importOpen &&
+        createPortal(
+          <CsvImportModal<DegreesImport>
+            title="استيراد الدرجات"
+            description="صف لكل طالب: الرقم القومي (أو كود الحكومة الالكترونية أو الاسم) وعمود لكل مادة باسمها. الخانة الفارغة لا تغيّر الدرجة الموجودة. يمكن استيراد ملف مُصدَّر من هنا مباشرة."
+            templateFilename="degrees-template.csv"
+            columns={importColumns}
+            mapRow={mapImportRow}
+            onImportRow={({ studentId, grades }) =>
+              api
+                .saveStudentGrades(
+                  token!,
+                  studentId,
+                  grades.map((g) => ({ ...g, scoreMin: null }))
+                )
+                .then(() => {})
+            }
+            onClose={() => setImportOpen(false)}
+            onFinished={load}
+          />,
           document.body
         )}
 

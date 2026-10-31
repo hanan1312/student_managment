@@ -82,6 +82,10 @@ Opened from **إضافة مدرسة** on the Students ribbon. It lists the schoo
 | الإدارة | From المستخدمين → إدارة تعليمية |
 | رقم التليفون | |
 
+- **تصدير** saves the list to Excel. **استيراد** reads Excel or CSV with the same columns: a school
+  whose name is already listed is updated (empty cells keep what it had), any other is added.
+  المدينة and الإدارة are matched by name (ا / أ / إ spelled either way); a name that isn't in
+  المستخدمين is left empty, with a warning in the preview.
 - A school that students are in can't be deleted, and the last school can't be deleted.
 - A city or education administration used by a school can't be deleted from المستخدمين.
 - These are the same schools the HR screens use.
@@ -195,6 +199,16 @@ that study it, and **each section has its own settings**:
 
 The marks can only be changed in المواد. They are read-only on the student's record.
 
+**Import / Export (المواد header):** one row per subject and section: المادة, المرحلة, الصف (the
+section's full path, as exported), النهاية الكبرى, النهاية الصغرى, خارج المجموع (نعم / لا).
+
+- **تصدير** saves every subject that way; a subject with no section is one row without one.
+- **استيراد:** a new subject name is added. An existing subject gets the row's section linked, or
+  that section's marks updated; its other sections are kept. Empty marks keep what the section had;
+  a صغرى alone makes the كبرى double it.
+- المرحلة can be left out when the الصف path is in only one stage. A الصف that isn't the last item
+  of a branch, or isn't found, rejects the row.
+
 ---
 
 ## 5. Degrees (الدرجات)
@@ -265,6 +279,17 @@ Changing the degree itself picks up the section's current marks.
   الميلاد, السن في ١ أكتوبر, المدرسة) can be ticked too; they are off until ticked. The choice is remembered in this browser; **استعادة الافتراضي** shows them all
   again. A subject column that wasn't listed before (another stage, a new subject) shows until it's
   hidden.
+- **تصدير** saves the table as shown (rows after filters, the columns ticked in الأعمدة, in their
+  order) to Excel.
+- **استيراد** reads Excel or CSV: one row per student, with الرقم القومي, كود الحكومة الالكترونية
+  or الاسم, and one column per subject named as the subject. An exported file can be imported back
+  as it is (its totals columns are ignored).
+  - Students are found by الرقم القومي, then كود الحكومة الالكترونية, then the name if only one
+    student has it.
+  - Empty cells (or "—") leave the degree as it is. Arabic digits (٤٥) are read.
+  - A degree above the subject's النهاية الكبرى rejects the row. A subject not linked to the
+    student's section is skipped, with a warning.
+  - Only the import's subjects are saved; the student's other degrees stay.
 - **Click a row** to edit that student's degrees.
 - **Printing:**
   - **طباعة الكل** prints the table rows currently shown (all filters apply), starting from the

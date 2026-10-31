@@ -1,9 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { X, Building2, Plus, Pencil, Trash2, Save } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSchools } from "../context/SchoolsContext";
 import { api, ApiError } from "../lib/api";
-import type { School, UserCatalogItem } from "../lib/types";
+import type { School, SchoolInput, UserCatalogItem } from "../lib/types";
+import { downloadExcel } from "../lib/excel";
+import { sameName } from "../lib/importValues";
+import CsvImportModal, { type ImportColumn } from "./CsvImportModal";
+import ImportExportButtons from "./ImportExportButtons";
 import { inputCls } from "./FormLayout";
 import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
 
@@ -18,6 +23,18 @@ const COLUMN_LABELS = {
 };
 const COLUMN_KEYS = Object.keys(COLUMN_LABELS) as (keyof typeof COLUMN_LABELS)[];
 
+// Import / Export use the table's columns. An imported school whose name is already listed updates
+// it (empty cells keep what it had); any other is added. المدينة / الإدارة are matched by name.
+const IMPORT_COLUMNS: ImportColumn[] = [
+  { key: "name", label: COLUMN_LABELS.name, required: true, example: "مدرسة النصر", aliases: ["المدرسة", "School"] },
+  { key: "address", label: COLUMN_LABELS.address, aliases: ["Address"] },
+  { key: "city", label: COLUMN_LABELS.city, aliases: ["City"] },
+  { key: "education_admin", label: COLUMN_LABELS.education_admin, aliases: ["إدارة تعليمية", "ادارة"] },
+  { key: "phone", label: COLUMN_LABELS.phone, aliases: ["التليفون", "الهاتف", "Phone"] },
+];
+
+type SchoolImport = { id: number | null; input: Partial<SchoolInput> };
+
 const EMPTY = { name: "", address: "", cityId: "" as number | "", educationAdminId: "" as number | "", phone: "" };
 
 export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
@@ -30,6 +47,7 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -93,6 +111,40 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const handleExport = () =>
+    downloadExcel(
+      "schools.xlsx",
+      IMPORT_COLUMNS.map((c) => c.label),
+      schools.map((s) => ({
+        [COLUMN_LABELS.name]: s.name,
+        [COLUMN_LABELS.address]: s.address ?? "",
+        [COLUMN_LABELS.city]: s.city_name ?? "",
+        [COLUMN_LABELS.education_admin]: s.education_admin_name ?? "",
+        [COLUMN_LABELS.phone]: s.phone ?? "",
+      }))
+    );
+
+  const mapImportRow = (raw: Record<string, string>): { input?: SchoolImport; error?: string; warning?: string } => {
+    const warnings: string[] = [];
+    const lookup = (items: UserCatalogItem[], value: string | undefined, what: string) => {
+      if (!value?.trim()) return undefined;
+      const found = items.find((i) => sameName(i.name, value));
+      if (!found) warnings.push(`${what} "${value.trim()}" غير موجودة في المستخدمين`);
+      return found?.id;
+    };
+    const cityId = lookup(cities, raw.city, "المدينة");
+    const educationAdminId = lookup(eduAdmins, raw.education_admin, "الإدارة");
+    const existing = schools.find((s) => sameName(s.name, raw.name));
+    const text = (v: string | undefined) => (v?.trim() ? v.trim() : undefined);
+    return {
+      input: {
+        id: existing?.id ?? null,
+        input: { name: raw.name.trim(), address: text(raw.address), phone: text(raw.phone), cityId, educationAdminId },
+      },
+      warning: [existing ? "موجودة: سيتم تحديثها" : null, ...warnings].filter(Boolean).join(" · ") || undefined,
+    };
+  };
+
   return (
     <div className="animate-fade-in fixed inset-0 z-30 flex items-center justify-center bg-ink-950/60 p-4 backdrop-blur-sm">
       <div className="animate-rise-in flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
@@ -101,9 +153,12 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
             <Building2 size={18} className="text-brand-600" />
             <h2 className="text-base font-semibold text-slate-800">المدارس</h2>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <ImportExportButtons onImport={() => setImportOpen(true)} onExport={handleExport} exportDisabled={schools.length === 0} />
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4 overflow-y-auto px-5 py-4">
@@ -232,6 +287,23 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       </div>
+
+      {importOpen &&
+        createPortal(
+          <CsvImportModal<SchoolImport>
+            title="استيراد المدارس"
+            description="المدرسة الموجودة بنفس الاسم تُحدَّث (الخانات الفارغة لا تغيّر بياناتها)، وغيرها تُضاف. المدينة والإدارة تُختاران بالاسم من المستخدمين."
+            templateFilename="schools-template.csv"
+            columns={IMPORT_COLUMNS}
+            mapRow={mapImportRow}
+            onImportRow={({ id, input }) =>
+              id ? updateSchool(id, input) : createSchool({ ...input, name: input.name ?? "" })
+            }
+            onClose={() => setImportOpen(false)}
+            onFinished={() => {}}
+          />,
+          document.body
+        )}
     </div>
   );
 }
