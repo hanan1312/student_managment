@@ -8,7 +8,7 @@ import {
   type ThHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
-import { ClipboardList, FileText, Printer, Search, X } from "lucide-react";
+import { ClipboardList, FileText, Printer, Search, Settings2, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { levelAndDescendants, useClasses } from "../context/ClassesContext";
 import { api, ApiError } from "../lib/api";
@@ -28,6 +28,7 @@ import {
 import { formatMoeCode } from "../lib/studentColumns";
 import type { DegreesOverviewStudent, StudentGrade, SubjectDegrees } from "../lib/types";
 import DegreesTablePrintModal from "./DegreesTablePrintModal";
+import ManageColumnsModal from "./ManageColumnsModal";
 import StudentCertificateModal, { type CertificateStudent } from "./StudentCertificateModal";
 import StudentDegreesEditor from "./StudentDegreesEditor";
 import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
@@ -56,6 +57,34 @@ function statusMatches(status: string | null, filter: StatusFilter) {
   return status === null;
 }
 
+// Columns hidden with الأعمدة, remembered in this browser. A hide-list, so a subject column that
+// wasn't there before (another stage, a new subject) shows until someone hides it.
+const HIDDEN_COLUMNS_KEY = "degrees-profile-hidden-columns";
+
+function loadHiddenColumns(): Set<string> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? "[]") as unknown;
+    return new Set(Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+const COLUMN_LABELS: Record<string, string> = {
+  name: "الاسم",
+  national_id: "الرقم القومي",
+  moe_code: "كود الحكومة الالكترونية",
+  division: "المرحلة",
+  section: "الصف",
+  total: "مجموع الدرجات",
+  percent: "النسبة المئوية",
+  status: "الحالة",
+};
+
+// The same columns' keys in DegreesTablePrintModal.
+const toPrintKey = (key: string) =>
+  key.startsWith("subject:") ? `subject-${key.slice(8)}` : key === "total" ? "score" : key === "percent" ? "percentage" : key;
+
 export default function DegreesProfileModal({ onClose }: { onClose: () => void }) {
   const { token } = useAuth();
   const [subjects, setSubjects] = useState<SubjectDegrees[]>([]);
@@ -79,6 +108,16 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
   const [printingCertificates, setPrintingCertificates] = useState<CertificateStudent[] | null>(null);
   const [printingTable, setPrintingTable] = useState(false);
   const [editing, setEditing] = useState<DegreesOverviewStudent | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(loadHiddenColumns);
+  const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]));
+    } catch {
+      // Storage unavailable: the choice just isn't remembered.
+    }
+  }, [hiddenColumns]);
 
   const load = async () => {
     if (!token) return;
@@ -173,7 +212,8 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
     ],
     [inTotal, outside]
   );
-  const columns = useColumnOrder("degrees-profile", columnKeys);
+  const shownColumnKeys = useMemo(() => columnKeys.filter((k) => !hiddenColumns.has(k)), [columnKeys, hiddenColumns]);
+  const columns = useColumnOrder("degrees-profile", shownColumnKeys);
 
   // Certificates print for the ticked students that are in the current view.
   const selectedInView = filtered.filter((s) => selectedIds.has(s.id));
@@ -216,7 +256,8 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
         —
       </td>
     );
-  const colCount = visibleSubjects.length + 11;
+  // The columns shown, plus the checkbox, م and the print button.
+  const colCount = columns.order.length + 3;
   const subjectById = new Map(visibleSubjects.map((s) => [s.id, s]));
   const headers: Record<string, ReactNode> = {
     name: <th className={`${th} text-start`}>الاسم</th>,
@@ -303,6 +344,14 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
                 طباعة الشهادات ({selectedInView.length})
               </button>
             )}
+            <button
+              onClick={() => setManageColumnsOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
+              title="اختيار الأعمدة المعروضة والمطبوعة"
+            >
+              <Settings2 size={14} />
+              الأعمدة
+            </button>
             <button
               onClick={() => setPrintingTable(true)}
               disabled={filtered.length === 0}
@@ -453,6 +502,26 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
           document.body
         )}
 
+      {manageColumnsOpen && (
+        <ManageColumnsModal
+          columns={columnKeys.map((key) => ({
+            key,
+            label: key.startsWith("subject:") ? subjectById.get(Number(key.slice(8)))?.name ?? key : COLUMN_LABELS[key] ?? key,
+          }))}
+          visible={new Set(shownColumnKeys)}
+          onToggle={(key) =>
+            setHiddenColumns((prev) => {
+              const next = new Set(prev);
+              if (next.has(key)) next.delete(key);
+              else next.add(key);
+              return next;
+            })
+          }
+          onReset={() => setHiddenColumns(new Set())}
+          onClose={() => setManageColumnsOpen(false)}
+        />
+      )}
+
       {printingCertificates && (
         <StudentCertificateModal students={printingCertificates} onClose={() => setPrintingCertificates(null)} />
       )}
@@ -462,6 +531,7 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
           students={filtered}
           subjects={visibleSubjects}
           scopeLevelIds={columnLevelIds}
+          initialColumns={columns.order.map(toPrintKey)}
           scopeLabel={[
             scopeInfo.label,
             statusFilter ? STATUS_FILTER_LABELS[statusFilter] : null,

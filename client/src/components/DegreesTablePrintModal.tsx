@@ -78,6 +78,7 @@ export default function DegreesTablePrintModal({
   subjects,
   scopeLevelIds,
   scopeLabel,
+  initialColumns,
   onClose,
 }: {
   students: DegreesOverviewStudent[];
@@ -85,6 +86,8 @@ export default function DegreesTablePrintModal({
   // The sections the المراحل filter covers (null = all), for each subject's marks and خارج flag.
   scopeLevelIds: Set<number> | null;
   scopeLabel: string;
+  // The columns to start from, in order (the table's الأعمدة choice). Default: all of them.
+  initialColumns?: string[];
   onClose: () => void;
 }) {
   const [removedIds, setRemovedIds] = useState<Set<number>>(new Set());
@@ -127,7 +130,10 @@ export default function DegreesTablePrintModal({
   }, [subjects, scopeLevelIds, students]);
   const columnByKey = useMemo(() => new Map(allColumns.map((c) => [c.key, c])), [allColumns]);
 
-  const [columns, setColumns] = useState<string[]>(() => allColumns.map((c) => c.key));
+  const [columns, setColumns] = useState<string[]>(() => {
+    const start = initialColumns?.filter((k) => columnByKey.has(k)) ?? [];
+    return start.length > 0 ? start : allColumns.map((c) => c.key);
+  });
   const { t } = useUiControl();
   const [title, setTitle] = useState(() => t("print.degreesTitle"));
   const [orientation, setOrientation] = useState<Orientation>("landscape");

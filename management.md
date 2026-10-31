@@ -260,9 +260,14 @@ Changing the degree itself picks up the section's current marks.
     chosen part of the tree.
   - **الحالة:** ناجح، راسب، or بدون درجات.
   - **Search** by name, national ID, كود الحكومة الالكترونية, division, section or school.
+- **الأعمدة** (top bar): tick which columns show: student data, each subject, مجموع الدرجات, النسبة
+  المئوية and الحالة. The choice is remembered in this browser; **استعادة الافتراضي** shows them all
+  again. A subject column that wasn't listed before (another stage, a new subject) shows until it's
+  hidden.
 - **Click a row** to edit that student's degrees.
 - **Printing:**
-  - **طباعة الكل** prints the table rows currently shown (all filters apply). The preview works like
+  - **طباعة الكل** prints the table rows currently shown (all filters apply), starting from the
+    table's columns in their current order (الأعمدة and any dragged headers). The preview works like
     the Students print: title, columns (student data, each subject, totals) that can be hidden or
     moved, portrait/landscape, font size, and removing single rows.
   - **Checkboxes** select students. **طباعة الشهادات (n)** prints a certificate for each ticked
