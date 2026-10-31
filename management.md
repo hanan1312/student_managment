@@ -274,11 +274,12 @@ Changing the degree itself picks up the section's current marks.
     chosen part of the tree.
   - **الحالة:** ناجح، راسب، or بدون درجات.
   - **Search** by name, national ID, كود الحكومة الالكترونية, division, section or school.
-- **الأعمدة** (top bar): tick which columns show: student data, each subject, مجموع الدرجات, النسبة
-  المئوية and الحالة. The rest of البيانات الأساسية (النوع, الديانة, نوع القيد, الجنسية, تاريخ
-  الميلاد, السن في ١ أكتوبر, المدرسة) can be ticked too; they are off until ticked. The choice is remembered in this browser; **استعادة الافتراضي** shows them all
-  again. A subject column that wasn't listed before (another stage, a new subject) shows until it's
-  hidden.
+- **الأعمدة** (top bar): tick which columns show: student data, **المواد**, مجموع الدرجات, النسبة
+  المئوية and الحالة. **المواد** is one checkbox for all the subject columns: ticked, the table shows
+  the subjects of the students shown (see Subject columns above). The rest of البيانات الأساسية
+  (النوع, الديانة, نوع القيد, الجنسية, تاريخ الميلاد, السن في ١ أكتوبر, المدرسة) can be ticked too;
+  they are off until ticked. The choice is remembered in this browser; **استعادة الافتراضي** puts
+  the defaults back.
 - **تصدير** saves the table as shown (rows after filters, the columns ticked in الأعمدة, in their
   order) to Excel.
 - **استيراد** reads Excel or CSV: one row per student, with الرقم القومي, كود الحكومة الالكترونية

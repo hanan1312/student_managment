@@ -65,15 +65,20 @@ function statusMatches(status: string | null, filter: StatusFilter) {
 }
 
 // Columns switched with الأعمدة, remembered in this browser: a usual column listed here is hidden,
-// an extra student-data column (DEGREES_INFO_FIELDS `extra`) listed here is shown. So a subject
-// column that wasn't there before (another stage, a new subject) shows until someone hides it.
+// an extra student-data column (DEGREES_INFO_FIELDS `extra`) listed here is shown. The subject
+// columns are one switch, "subjects": on, the subjects of the students shown all show.
 const HIDDEN_COLUMNS_KEY = "degrees-profile-hidden-columns";
 const EXTRA_COLUMNS = new Set(DEGREES_INFO_FIELDS.filter((f) => f.extra).map((f) => f.key));
 
 function loadHiddenColumns(): Set<string> {
   try {
     const parsed = JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? "[]") as unknown;
-    return new Set(Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === "string") : []);
+    // Subjects used to be switched one by one ("subject:<id>"); those choices are dropped.
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((k): k is string => typeof k === "string" && !k.startsWith("subject:"))
+        : []
+    );
   } catch {
     return new Set();
   }
@@ -239,7 +244,10 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
     [inTotal, outside]
   );
   const shownColumnKeys = useMemo(
-    () => columnKeys.filter((k) => EXTRA_COLUMNS.has(k) === switchedColumns.has(k)),
+    () =>
+      columnKeys.filter((k) =>
+        k.startsWith("subject:") ? !switchedColumns.has("subjects") : EXTRA_COLUMNS.has(k) === switchedColumns.has(k)
+      ),
     [columnKeys, switchedColumns]
   );
   const columns = useColumnOrder("degrees-profile", shownColumnKeys);
@@ -628,11 +636,15 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
 
       {manageColumnsOpen && (
         <ManageColumnsModal
-          columns={columnKeys.map((key) => ({
-            key,
-            label: key.startsWith("subject:") ? subjectById.get(Number(key.slice(8)))?.name ?? key : COLUMN_LABELS[key] ?? key,
-          }))}
-          visible={new Set(shownColumnKeys)}
+          // The subject columns are one checkbox, in the place of the first subject.
+          columns={columnKeys.flatMap((key) =>
+            !key.startsWith("subject:")
+              ? [{ key, label: COLUMN_LABELS[key] ?? key }]
+              : key === columnKeys.find((k) => k.startsWith("subject:"))
+                ? [{ key: "subjects", label: `المواد (${visibleSubjects.length})` }]
+                : []
+          )}
+          visible={new Set([...shownColumnKeys, ...(switchedColumns.has("subjects") ? [] : ["subjects"])])}
           onToggle={(key) =>
             setSwitchedColumns((prev) => {
               const next = new Set(prev);
