@@ -11,7 +11,9 @@ import {
 } from "../lib/degrees";
 import { moveItem, useSignatures } from "../lib/print";
 import { useUiControl } from "../lib/uiControl";
-import { formatMoeCode } from "../lib/studentColumns";
+import { useSettings } from "../context/SettingsContext";
+import { DEGREES_INFO_FIELDS } from "../lib/degreesColumns";
+import { ageReferenceDate } from "../lib/studentAge";
 import type { DegreesOverviewStudent, SubjectDegrees } from "../lib/types";
 import {
   LayoutOptions,
@@ -29,7 +31,7 @@ import {
 } from "./PrintParts";
 
 // Short values that read badly when wrapped; names, subjects and الحالة may wrap so wide tables fit.
-const NOWRAP_KEYS = new Set(["national_id", "moe_code", "score", "percentage"]);
+const NOWRAP_KEYS = new Set(["national_id", "moe_code", "birthday", "score", "percentage"]);
 
 type Row = { student: DegreesOverviewStudent; totals: ReturnType<typeof degreeTotals> };
 
@@ -41,14 +43,6 @@ type Column = {
   render: (row: Row) => string;
   className?: (row: Row) => string;
 };
-
-const INFO_COLUMNS: Column[] = [
-  { key: "name", label: "الاسم", render: ({ student }) => student.name },
-  { key: "national_id", label: "الرقم القومي", render: ({ student }) => student.national_id ?? "" },
-  { key: "moe_code", label: "كود الحكومة الالكترونية", render: ({ student }) => formatMoeCode(student.moe_code) },
-  { key: "division", label: "المرحلة", render: ({ student }) => student.division ?? "" },
-  { key: "section", label: "الصف", render: ({ student }) => student.section ?? "" },
-];
 
 const RESULT_COLUMNS: Column[] = [
   { key: "percentage", label: "النسبة المئوية", render: ({ totals }) => formatPercentage(totals.percentage) },
@@ -90,6 +84,12 @@ export default function DegreesTablePrintModal({
   initialColumns?: string[];
   onClose: () => void;
 }) {
+  const { settings } = useSettings();
+  const ageYear = settings.academic_year;
+  const infoColumns = useMemo<Column[]>(() => {
+    const ageRef = ageReferenceDate(ageYear);
+    return DEGREES_INFO_FIELDS.map((f) => ({ key: f.key, label: f.label, render: ({ student }) => f.get(student, ageRef) }));
+  }, [ageYear]);
   const [removedIds, setRemovedIds] = useState<Set<number>>(new Set());
   const rows = useMemo<Row[]>(
     () => students.filter((s) => !removedIds.has(s.id)).map((student) => ({ student, totals: degreeTotals(student.grades) })),
@@ -118,7 +118,7 @@ export default function DegreesTablePrintModal({
     };
     return {
       allColumns: [
-        ...INFO_COLUMNS,
+        ...infoColumns,
         ...inTotal.map(subjectColumn),
         totalColumn,
         ...outside.map(subjectColumn),
@@ -127,7 +127,7 @@ export default function DegreesTablePrintModal({
       subjectColumns: [...inTotal, ...outside].map(subjectColumn),
       resultColumns: [totalColumn, ...RESULT_COLUMNS],
     };
-  }, [subjects, scopeLevelIds, students]);
+  }, [subjects, scopeLevelIds, students, infoColumns]);
   const columnByKey = useMemo(() => new Map(allColumns.map((c) => [c.key, c])), [allColumns]);
 
   const [columns, setColumns] = useState<string[]>(() => {
@@ -159,7 +159,7 @@ export default function DegreesTablePrintModal({
   const options = (
     <>
       <TitleOption value={title} onChange={setTitle} />
-      {columnGroup("بيانات الطالب", INFO_COLUMNS)}
+      {columnGroup("بيانات الطالب", infoColumns)}
       {subjectColumns.length > 0 && columnGroup("المواد", subjectColumns)}
       {columnGroup("النتيجة", resultColumns)}
       <p className="text-[11px] text-slate-400">رتّب الأعمدة بالأسهم في رأس الجدول.</p>

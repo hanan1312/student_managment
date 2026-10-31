@@ -397,7 +397,8 @@ studentsRouter.get("/degrees-overview", requireAuth, (req, res) => {
   const students = (
     db
       .prepare(
-        `SELECT id, seq_no, name, national_id, moe_code, division, section, school, level_id FROM students
+        `SELECT id, seq_no, name, national_id, moe_code, division, section, school, level_id,
+                gender, religion, enrollment_type, nationality, birthday FROM students
          WHERE 1=1${scopeSql(req).sql} ORDER BY seq_no ASC`
       )
       .all(...scopeSql(req).params) as any[]

@@ -261,7 +261,8 @@ Changing the degree itself picks up the section's current marks.
   - **الحالة:** ناجح، راسب، or بدون درجات.
   - **Search** by name, national ID, كود الحكومة الالكترونية, division, section or school.
 - **الأعمدة** (top bar): tick which columns show: student data, each subject, مجموع الدرجات, النسبة
-  المئوية and الحالة. The choice is remembered in this browser; **استعادة الافتراضي** shows them all
+  المئوية and الحالة. The rest of البيانات الأساسية (النوع, الديانة, نوع القيد, الجنسية, تاريخ
+  الميلاد, السن في ١ أكتوبر, المدرسة) can be ticked too; they are off until ticked. The choice is remembered in this browser; **استعادة الافتراضي** shows them all
   again. A subject column that wasn't listed before (another stage, a new subject) shows until it's
   hidden.
 - **Click a row** to edit that student's degrees.

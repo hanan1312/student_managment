@@ -203,6 +203,11 @@ export type DegreesOverviewStudent = {
   section: string | null;
   school: string | null;
   level_id: number | null;
+  gender: string | null;
+  religion: string | null;
+  enrollment_type: string | null;
+  nationality: string | null;
+  birthday: string | null;
   grades: StudentGrade[];
 };
 

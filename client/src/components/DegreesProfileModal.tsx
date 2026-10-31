@@ -28,6 +28,9 @@ import {
 import { formatMoeCode } from "../lib/studentColumns";
 import type { DegreesOverviewStudent, StudentGrade, SubjectDegrees } from "../lib/types";
 import DegreesTablePrintModal from "./DegreesTablePrintModal";
+import { useSettings } from "../context/SettingsContext";
+import { DEGREES_INFO_FIELDS } from "../lib/degreesColumns";
+import { ageReferenceDate } from "../lib/studentAge";
 import ManageColumnsModal from "./ManageColumnsModal";
 import StudentCertificateModal, { type CertificateStudent } from "./StudentCertificateModal";
 import StudentDegreesEditor from "./StudentDegreesEditor";
@@ -57,9 +60,11 @@ function statusMatches(status: string | null, filter: StatusFilter) {
   return status === null;
 }
 
-// Columns hidden with الأعمدة, remembered in this browser. A hide-list, so a subject column that
-// wasn't there before (another stage, a new subject) shows until someone hides it.
+// Columns switched with الأعمدة, remembered in this browser: a usual column listed here is hidden,
+// an extra student-data column (DEGREES_INFO_FIELDS `extra`) listed here is shown. So a subject
+// column that wasn't there before (another stage, a new subject) shows until someone hides it.
 const HIDDEN_COLUMNS_KEY = "degrees-profile-hidden-columns";
+const EXTRA_COLUMNS = new Set(DEGREES_INFO_FIELDS.filter((f) => f.extra).map((f) => f.key));
 
 function loadHiddenColumns(): Set<string> {
   try {
@@ -71,11 +76,7 @@ function loadHiddenColumns(): Set<string> {
 }
 
 const COLUMN_LABELS: Record<string, string> = {
-  name: "الاسم",
-  national_id: "الرقم القومي",
-  moe_code: "كود الحكومة الالكترونية",
-  division: "المرحلة",
-  section: "الصف",
+  ...Object.fromEntries(DEGREES_INFO_FIELDS.map((f) => [f.key, f.label])),
   total: "مجموع الدرجات",
   percent: "النسبة المئوية",
   status: "الحالة",
@@ -108,16 +109,18 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
   const [printingCertificates, setPrintingCertificates] = useState<CertificateStudent[] | null>(null);
   const [printingTable, setPrintingTable] = useState(false);
   const [editing, setEditing] = useState<DegreesOverviewStudent | null>(null);
-  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(loadHiddenColumns);
+  const { settings } = useSettings();
+  const ageRef = ageReferenceDate(settings.academic_year);
+  const [switchedColumns, setSwitchedColumns] = useState<Set<string>>(loadHiddenColumns);
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
 
   useEffect(() => {
     try {
-      localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]));
+      localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...switchedColumns]));
     } catch {
       // Storage unavailable: the choice just isn't remembered.
     }
-  }, [hiddenColumns]);
+  }, [switchedColumns]);
 
   const load = async () => {
     if (!token) return;
@@ -199,11 +202,7 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
   const totalMarks = useMemo(() => sharedTotalMarks(filteredRows.map((r) => r.totals)), [filteredRows]);
   const columnKeys = useMemo(
     () => [
-      "name",
-      "national_id",
-      "moe_code",
-      "division",
-      "section",
+      ...DEGREES_INFO_FIELDS.map((f) => f.key),
       ...inTotal.map((s) => `subject:${s.id}`),
       "total",
       ...outside.map((s) => `subject:${s.id}`),
@@ -212,7 +211,10 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
     ],
     [inTotal, outside]
   );
-  const shownColumnKeys = useMemo(() => columnKeys.filter((k) => !hiddenColumns.has(k)), [columnKeys, hiddenColumns]);
+  const shownColumnKeys = useMemo(
+    () => columnKeys.filter((k) => EXTRA_COLUMNS.has(k) === switchedColumns.has(k)),
+    [columnKeys, switchedColumns]
+  );
   const columns = useColumnOrder("degrees-profile", shownColumnKeys);
 
   // Certificates print for the ticked students that are in the current view.
@@ -260,11 +262,7 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
   const colCount = columns.order.length + 3;
   const subjectById = new Map(visibleSubjects.map((s) => [s.id, s]));
   const headers: Record<string, ReactNode> = {
-    name: <th className={`${th} text-start`}>الاسم</th>,
-    national_id: <th className={`${th} text-start`}>الرقم القومي</th>,
-    moe_code: <th className={`${th} text-start`}>كود الحكومة الالكترونية</th>,
-    division: <th className={`${th} text-start`}>المرحلة</th>,
-    section: <th className={`${th} text-start`}>الصف</th>,
+    ...Object.fromEntries(DEGREES_INFO_FIELDS.map((f) => [f.key, <th key={f.key} className={`${th} text-start`}>{f.label}</th>])),
     total: (
       <th className={`${th} border-s bg-brand-50 text-center text-brand-700`}>
         مجموع الدرجات
@@ -427,11 +425,14 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
                         </td>
                         <td className={`${td} text-slate-400`}>{st.seq_no}</td>
                         {orderedCells(columns.order, {
-                          name: <td className={`${td} text-base text-slate-800`}>{st.name}</td>,
-                          national_id: <td className={`${td} text-slate-600`}>{st.national_id}</td>,
-                          moe_code: <td className={`${td} text-slate-600`}>{formatMoeCode(st.moe_code)}</td>,
-                          division: <td className={`${td} text-slate-600`}>{st.division}</td>,
-                          section: <td className={`${td} text-slate-600`}>{st.section}</td>,
+                          ...Object.fromEntries(
+                            DEGREES_INFO_FIELDS.map((f) => [
+                              f.key,
+                              <td key={f.key} className={`${td} ${f.key === "name" ? "text-base text-slate-800" : "text-slate-600"}`}>
+                                {f.get(st, ageRef)}
+                              </td>,
+                            ])
+                          ),
                           ...Object.fromEntries(
                             visibleSubjects.map((s) => [`subject:${s.id}`, subjectCell(s, bySubject.get(s.id))])
                           ),
@@ -510,14 +511,14 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
           }))}
           visible={new Set(shownColumnKeys)}
           onToggle={(key) =>
-            setHiddenColumns((prev) => {
+            setSwitchedColumns((prev) => {
               const next = new Set(prev);
               if (next.has(key)) next.delete(key);
               else next.add(key);
               return next;
             })
           }
-          onReset={() => setHiddenColumns(new Set())}
+          onReset={() => setSwitchedColumns(new Set())}
           onClose={() => setManageColumnsOpen(false)}
         />
       )}
