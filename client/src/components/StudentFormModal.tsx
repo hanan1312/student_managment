@@ -34,6 +34,7 @@ import { genderLabel } from "../lib/studentColumns";
 import { SHOW_EXTENDED_FEATURES } from "../lib/features";
 import { ageOn, ageReferenceDate } from "../lib/studentAge";
 import { birthdayFromNationalId } from "../lib/nationalId";
+import { parseFormFields, STUDENT_FORM_FIELDS, type StudentFormFields } from "../lib/certificateForms";
 import StudentDegreesEditor from "./StudentDegreesEditor";
 import { studentDisplayId } from "../lib/studentId";
 import { Section, Field, inputCls, disabledInputCls } from "./FormLayout";
@@ -485,6 +486,8 @@ export default function StudentFormModal({ tree, initial, onClose, onSubmit }: P
   const [usesBus, setUsesBus] = useState(Boolean(initial?.uses_bus));
   const [photoUrl, setPhotoUrl] = useState<string | null>(initial?.photo_url ?? null);
   const [values, setValues] = useState<Record<TextKey, string>>(() => initialValues(initial));
+  // بيانات بيان النجاح: the official result form's texts for this student.
+  const [formFields, setFormFields] = useState<StudentFormFields>(() => parseFormFields(initial?.form_fields));
   const [fatherNameTouched, setFatherNameTouched] = useState(() => Boolean(initial?.father_name?.trim()));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -583,6 +586,7 @@ export default function StudentFormModal({ tree, initial, onClose, onSubmit }: P
         transferredIn: values.transferredIn || undefined,
         school: values.school.trim() || undefined,
         enrollmentType: values.enrollmentType || undefined,
+        formFields: Object.fromEntries(Object.entries(formFields).filter(([, text]) => text?.trim())) as Record<string, string>,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "حدث خطأ ما.");
@@ -751,6 +755,20 @@ export default function StudentFormModal({ tree, initial, onClose, onSubmit }: P
                       className={disabledInputCls}
                     />
                   </Field>
+                </Section>
+
+                <Section title="بيانات بيان النجاح" icon={FileText}>
+                  {/* Printed on the official result form (بيان نجاح طالب) when ticked in its preview.
+                      Empty: the form's own default (e.g. the year, the school's administration). */}
+                  {STUDENT_FORM_FIELDS.map((f) => (
+                    <Field key={f.key} label={f.label}>
+                      <input
+                        value={formFields[f.key] ?? ""}
+                        onChange={(e) => setFormFields((v) => ({ ...v, [f.key]: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </Field>
+                  ))}
                 </Section>
 
                 <Section title="بيانات القبول" icon={GraduationCap}>

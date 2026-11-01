@@ -2,7 +2,17 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useSchools } from "../context/SchoolsContext";
 import { useSettings } from "../context/SettingsContext";
 import { degreeTotals, formatDegree, formatPercentage, PASS_LABEL, passStatus, splitByOutside, statusTextClass } from "../lib/degrees";
-import { certificateFormFor, FORM_SIGNATURES, orderGrades, type CertificateForm, type FormKind } from "../lib/certificateForms";
+import {
+  certificateFormFor,
+  FORM_FIELD_KINDS,
+  FORM_SIGNATURES,
+  orderGrades,
+  parseFormFields,
+  STUDENT_FORM_FIELDS,
+  type CertificateForm,
+  type StudentFormFieldKey,
+  type StudentFormFields,
+} from "../lib/certificateForms";
 import { useSignatures, type Signatures } from "../lib/print";
 import { formatMoeCode } from "../lib/studentColumns";
 import type { StudentGrade } from "../lib/types";
@@ -27,6 +37,8 @@ export type CertificateStudent = {
   division: string | null;
   section: string | null;
   school: string | null;
+  // The official form's texts saved with the student (البيانات الأساسية).
+  form_fields?: string | null;
   grades: StudentGrade[];
 };
 
@@ -58,49 +70,33 @@ function useAdminLine(schoolName: string | null): string {
   return adminName && !normalizeAlef(adminName).startsWith(normalizeAlef(adminPrefix)) ? `${adminPrefix} ${adminName}` : adminName;
 }
 
-// The editable texts of the official forms (header lines, الدور, the fees, the dates, …). A value
-// typed in the options panel is for every student; one typed on a sheet is for that student only.
-// The header lines are remembered in this browser.
-type FieldKey =
-  | "gov"
-  | "directorate"
-  | "admin"
-  | "dept_secondary"
-  | "dept_prep"
-  | "title_prep"
-  | "grade"
-  | "round"
-  | "year"
-  | "seat"
-  | "lang2"
-  | "result"
-  | "verdict"
-  | "submitTo"
-  | "feeQ"
-  | "feeJ"
-  | "postal"
-  | "date"
-  | "writtenOn";
+// The texts of the official forms (header lines, الدور, the fees, the dates, …). Most are saved with
+// the student (البيانات الأساسية → بيانات بيان النجاح; lib/certificateForms.ts) and printed when
+// their checkbox is ticked in the preview; a ticked field with no saved text prints the form's own
+// default, an unticked one an empty line. Anything can still be typed on a sheet for that printout.
+type FieldKey = StudentFormFieldKey | "grade" | "seat" | "lang2" | "result" | "verdict";
 
-const REMEMBERED_FIELDS: FieldKey[] = ["gov", "directorate", "dept_secondary", "dept_prep", "title_prep"];
-const FIELDS_KEY = "certificate-form-fields-v1";
+const SAVED_FIELDS = new Set<string>(STUDENT_FORM_FIELDS.map((f) => f.key));
+const HIDDEN_FIELDS_KEY = "certificate-form-hidden-fields-v1";
 
 type FieldsState = {
-  shared: Partial<Record<FieldKey, string>>;
-  perStudent: Record<number, Partial<Record<FieldKey, string>>>;
+  // Typed on a sheet, for this printout only.
+  typed: Record<number, Partial<Record<FieldKey, string>>>;
+  saved: Record<number, StudentFormFields>;
+  hidden: Set<string>;
 };
 
 const FieldsContext = createContext<{
   state: FieldsState;
-  setForStudent: (studentId: number, key: FieldKey, value: string) => void;
+  setTyped: (studentId: number, key: FieldKey, value: string) => void;
 } | null>(null);
 
-function loadRememberedFields(): FieldsState["shared"] {
+function loadHiddenFields(): Set<string> {
   try {
-    const parsed = JSON.parse(localStorage.getItem(FIELDS_KEY) ?? "{}") as Record<string, unknown>;
-    return Object.fromEntries(REMEMBERED_FIELDS.filter((k) => typeof parsed[k] === "string").map((k) => [k, parsed[k] as string]));
+    const parsed = JSON.parse(localStorage.getItem(HIDDEN_FIELDS_KEY) ?? "[]") as unknown;
+    return new Set(Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === "string") : []);
   } catch {
-    return {};
+    return new Set();
   }
 }
 
@@ -119,12 +115,14 @@ function Field({
   minChars?: number;
   className?: string;
 }) {
-  const ctx = useContext(FieldsContext)!;
-  const value = ctx.state.perStudent[studentId]?.[name] ?? ctx.state.shared[name] ?? fallback;
+  const { state, setTyped } = useContext(FieldsContext)!;
+  const saved = SAVED_FIELDS.has(name) ? state.saved[studentId]?.[name as StudentFormFieldKey] : undefined;
+  const printed = SAVED_FIELDS.has(name) && state.hidden.has(name) ? "" : saved || fallback;
+  const value = state.typed[studentId]?.[name] ?? printed;
   return (
     <input
       value={value}
-      onChange={(e) => ctx.setForStudent(studentId, name, e.target.value)}
+      onChange={(e) => setTyped(studentId, name, e.target.value)}
       size={Math.max(minChars, [...value].length + 1)}
       className={`form-field border-0 border-b border-dotted border-slate-500 bg-transparent px-1 text-center font-semibold text-slate-900 outline-none focus:bg-amber-50 ${className}`}
     />
@@ -532,24 +530,6 @@ function Certificate({
   );
 }
 
-// The texts of the official forms that can be typed once for every student, in the options panel.
-const SHARED_FIELDS: { key: FieldKey; label: string; kinds: FormKind[] }[] = [
-  { key: "gov", label: "المحافظة", kinds: ["secondary", "prep"] },
-  { key: "directorate", label: "المديرية", kinds: ["secondary", "prep"] },
-  { key: "admin", label: "الإدارة التعليمية", kinds: ["secondary", "prep"] },
-  { key: "dept_secondary", label: "القسم (الثانوي)", kinds: ["secondary"] },
-  { key: "dept_prep", label: "القسم (الإعدادي)", kinds: ["prep"] },
-  { key: "title_prep", label: "عنوان الإعدادي", kinds: ["prep"] },
-  { key: "round", label: "الدور", kinds: ["secondary", "prep"] },
-  { key: "year", label: "العام", kinds: ["secondary", "prep"] },
-  { key: "submitTo", label: "لتقديمه إلى", kinds: ["secondary", "prep"] },
-  { key: "feeQ", label: "الرسوم (ق)", kinds: ["secondary"] },
-  { key: "feeJ", label: "الرسوم (ج)", kinds: ["secondary", "prep"] },
-  { key: "postal", label: "رقم الحوالة", kinds: ["secondary", "prep"] },
-  { key: "date", label: "بتاريخ", kinds: ["secondary", "prep"] },
-  { key: "writtenOn", label: "تحريرا في", kinds: ["prep"] },
-];
-
 // Print preview of one or more students' degrees certificates, with options like the Students
 // print: which students, which rows, layout, and one certificate per page or one after another.
 // A student in a stage with an official form (الإعدادية، الصف الأول والثاني الثانوي) gets that form
@@ -584,37 +564,47 @@ export default function StudentCertificateModal({
   );
   const [fontSize, setFontSize] = useState(12);
   const [pagePerStudent, setPagePerStudent] = useState(true);
-  const [fields, setFields] = useState<FieldsState>(() => ({ shared: loadRememberedFields(), perStudent: {} }));
+  const [typed, setTyped] = useState<FieldsState["typed"]>({});
+  const [hiddenFields, setHiddenFields] = useState<Set<string>>(loadHiddenFields);
 
   useEffect(() => {
     try {
-      const remembered = Object.fromEntries(REMEMBERED_FIELDS.filter((k) => fields.shared[k] !== undefined).map((k) => [k, fields.shared[k]]));
-      localStorage.setItem(FIELDS_KEY, JSON.stringify(remembered));
+      localStorage.setItem(HIDDEN_FIELDS_KEY, JSON.stringify([...hiddenFields]));
     } catch {
       // ignore storage failures
     }
-  }, [fields.shared]);
+  }, [hiddenFields]);
 
   const printed = students.filter((s) => included.has(s.id));
   const kinds = new Set(printed.map((s) => formOf(s).kind));
   const setOption = (key: keyof CertificateOptions) => (value: boolean) => setOptions((o) => ({ ...o, [key]: value }));
-  // Typed in the panel: for every student (replacing what was typed on single sheets).
-  const setShared = (key: FieldKey, value: string) =>
-    setFields((f) => ({
-      shared: { ...f.shared, [key]: value },
-      perStudent: Object.fromEntries(
-        Object.entries(f.perStudent).map(([id, values]) => {
-          const { [key]: _dropped, ...rest } = values;
+  const fieldsContext = {
+    state: {
+      typed,
+      saved: Object.fromEntries(students.map((s) => [s.id, parseFormFields(s.form_fields)])),
+      hidden: hiddenFields,
+    },
+    setTyped: (studentId: number, key: FieldKey, value: string) =>
+      setTyped((t) => ({ ...t, [studentId]: { ...t[studentId], [key]: value } })),
+  };
+  const formFields = STUDENT_FORM_FIELDS.filter((f) => FORM_FIELD_KINDS[f.key].some((k) => kinds.has(k)));
+  // Ticking or unticking a field drops what was typed for it on the sheets.
+  const toggleField = (key: string, on: boolean) => {
+    setHiddenFields((prev) => {
+      const next = new Set(prev);
+      if (on) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setTyped((t) =>
+      Object.fromEntries(
+        Object.entries(t).map(([id, values]) => {
+          const { [key as FieldKey]: _dropped, ...rest } = values;
           return [id, rest];
         })
-      ),
-    }));
-  const fieldsContext = {
-    state: fields,
-    setForStudent: (studentId: number, key: FieldKey, value: string) =>
-      setFields((f) => ({ ...f, perStudent: { ...f.perStudent, [studentId]: { ...f.perStudent[studentId], [key]: value } } })),
+      )
+    );
   };
-  const sharedFields = SHARED_FIELDS.filter((f) => f.kinds.some((k) => kinds.has(k)));
 
   const optionsPanel = (
     <>
@@ -627,21 +617,27 @@ export default function StudentCertificateModal({
 
       {kinds.has("generic") && <TitleOption value={options.title} onChange={(title) => setOptions((o) => ({ ...o, title }))} />}
 
-      {sharedFields.length > 0 && (
-        <OptionSection label="بيانات النموذج (لكل الطلاب)">
-          <p className="px-1.5 text-[11px] leading-5 text-slate-400">أو اكتب مباشرة في المعاينة لطالب واحد.</p>
-          <div className="space-y-1">
-            {sharedFields.map((f) => (
-              <label key={f.key} className="flex items-center gap-2 px-1.5 text-xs text-slate-600">
-                <span className="w-24 shrink-0">{f.label}</span>
-                <input
-                  value={fields.shared[f.key] ?? ""}
-                  onChange={(e) => setShared(f.key, e.target.value)}
-                  className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
-                />
-              </label>
-            ))}
-          </div>
+      {formFields.length > 0 && (
+        <OptionSection
+          label="بيانات النموذج"
+          actions={
+            <>
+              <button onClick={() => formFields.forEach((f) => toggleField(f.key, true))} className="hover:underline">
+                الكل
+              </button>
+              <button onClick={() => formFields.forEach((f) => toggleField(f.key, false))} className="hover:underline">
+                مسح
+              </button>
+            </>
+          }
+        >
+          <p className="px-1.5 text-[11px] leading-5 text-slate-400">
+            من بيانات الطالب (البيانات الأساسية ← بيانات بيان النجاح). غير المحدد يُطبع سطرًا فارغًا. يمكن أيضًا الكتابة مباشرة في
+            المعاينة.
+          </p>
+          {formFields.map((f) => (
+            <OptionCheckbox key={f.key} label={f.label} checked={!hiddenFields.has(f.key)} onChange={(on) => toggleField(f.key, on)} />
+          ))}
         </OptionSection>
       )}
 

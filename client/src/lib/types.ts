@@ -107,6 +107,8 @@ export type Student = {
   transferred_in: string | null;
   school: string | null;
   enrollment_type: string | null;
+  // The official result form's texts (JSON; lib/certificateForms.ts).
+  form_fields?: string | null;
   total_degrees?: number | null;
   percentage?: number | null;
 };
@@ -162,6 +164,7 @@ export type StudentInput = {
   school?: string;
   enrollmentType?: string;
   levelId?: number | null;
+  formFields?: Record<string, string>;
 };
 
 export type StudentGrade = {
@@ -208,6 +211,7 @@ export type DegreesOverviewStudent = {
   enrollment_type: string | null;
   nationality: string | null;
   birthday: string | null;
+  form_fields?: string | null;
   grades: StudentGrade[];
 };
 

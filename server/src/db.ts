@@ -592,6 +592,9 @@ const STUDENT_COLUMNS: [string, string][] = [
   ["enrollment_type", "TEXT"],
   // A student's Position is a level (Division > Section); classes are no longer picked.
   ["level_id", "INTEGER REFERENCES levels(id)"],
+  // The texts of the official result forms kept with the student (المحافظة، الدور، رقم الحوالة، …),
+  // as one JSON object; see client/src/lib/certificateForms.ts (STUDENT_FORM_FIELDS).
+  ["form_fields", "TEXT"],
 ];
 
 function migrateStudentsColumns() {

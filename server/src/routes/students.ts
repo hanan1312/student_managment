@@ -124,6 +124,15 @@ studentsRouter.get("/", requireAuth, (req, res) => {
   res.json({ students: rows, count: rows.length });
 });
 
+// The official form's texts sent as { key: text }; kept as JSON with only the non-empty strings.
+function formFieldsJson(v: unknown): string | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const entries = Object.entries(v as Record<string, unknown>)
+    .filter(([, text]) => typeof text === "string" && text.trim())
+    .map(([key, text]) => [key, (text as string).trim()]);
+  return entries.length > 0 ? JSON.stringify(Object.fromEntries(entries)) : null;
+}
+
 function boolToInt(v: unknown) {
   return v ? 1 : 0;
 }
@@ -166,8 +175,8 @@ studentsRouter.post("/", requireAuth, (req, res) => {
          father_company, father_email, mother_name, mother_national_id, mother_mobile, mother_job, mother_education,
          mother_company, mother_email, notes, medical_condition, education_authority, special_case, integrated,
          uses_bus, emergency_name, emergency_tel, transferred_from, transferred_in, school, level_id, enrollment_type,
-         academic_year_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         academic_year_id, form_fields)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       maxSeq + 1,
@@ -221,7 +230,8 @@ studentsRouter.post("/", requireAuth, (req, res) => {
       b.school ?? null,
       b.levelId ?? levelOfClass(b.classId),
       b.enrollmentType ?? null,
-      currentAcademicYearId()
+      currentAcademicYearId(),
+      formFieldsJson(b.formFields)
     );
 
   syncStudentPositionText();
@@ -261,7 +271,7 @@ studentsRouter.put("/:id", requireAuth, (req, res) => {
       mother_mobile = ?, mother_job = ?, mother_education = ?, mother_company = ?, mother_email = ?,
       notes = ?, medical_condition = ?, education_authority = ?, special_case = ?, integrated = ?,
       uses_bus = ?, emergency_name = ?, emergency_tel = ?, transferred_from = ?, transferred_in = ?,
-      school = ?, level_id = ?, enrollment_type = ?
+      school = ?, level_id = ?, enrollment_type = ?, form_fields = ?
      WHERE id = ?`
   ).run(
     b.gender ?? existing.gender,
@@ -314,6 +324,8 @@ studentsRouter.put("/:id", requireAuth, (req, res) => {
     b.school ?? existing.school,
     levelId,
     b.enrollmentType ?? existing.enrollment_type,
+    // Sent: replaces the form's texts (empty clears them); not sent: kept.
+    b.formFields === undefined ? existing.form_fields : formFieldsJson(b.formFields),
     id
   );
 
@@ -410,7 +422,7 @@ studentsRouter.get("/degrees-overview", requireAuth, (req, res) => {
     db
       .prepare(
         `SELECT id, seq_no, name, national_id, moe_code, division, section, school, level_id,
-                gender, religion, enrollment_type, nationality, birthday FROM students
+                gender, religion, enrollment_type, nationality, birthday, form_fields FROM students
          WHERE academic_year_id = ?${scopeSql(req).sql} ORDER BY seq_no ASC`
       )
       .all(currentAcademicYearId(), ...scopeSql(req).params) as any[]

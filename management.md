@@ -341,10 +341,15 @@ form, laid out as the paper one:
 
 - Subjects are in the paper form's order. The forms' subjects were added to **المواد** and linked to
   their sections with the forms' marks (see §8). A section whose marks were already set keeps them.
-- **Editable texts:** the header lines (المحافظة, المديرية, الإدارة, القسم), الدور, العام, رقم الجلوس,
-  اللغة الثانية, نتيجة الطالب, لتقديمه إلى, the fees (ق / ج), رقم الحوالة, بتاريخ and تحريرا في. Type
-  them in **بيانات النموذج (لكل الطلاب)** for every student, or straight on one sheet for that student
-  only. The header lines are remembered in this browser.
+- **The form's texts are student data:** البيانات الأساسية → **بيانات بيان النجاح** holds المحافظة,
+  المديرية, الإدارة التعليمية, القسم (الثانوي / الإعدادي), عنوان الإعدادي, الدور, العام, لتقديمه إلى,
+  الرسوم (ق / ج), رقم الحوالة, بتاريخ and تحريرا في for each student.
+- **بيانات النموذج** in the preview has a checkbox per field (only those of the forms being printed):
+  ticked, the student's text is printed, or the form's default when the student has none (the open
+  year, the school's administration, التحكم's المديرية, the forms' own titles); unticked, an empty
+  line to fill by hand. The choice is remembered in this browser.
+- Any text (also رقم الجلوس, اللغة الثانية, نتيجة الطالب) can still be typed straight on a sheet, for
+  that printout only.
 - **Signatures** as on the paper: secondary رئيس القسم · مدير شئون الطلبة · يعتمد مدير الإدارة; prep
   المراجع · رئيس القسم · مدير شئون الطلبة · مدير عام الإدارة. Each form's captions can be edited.
 - **النموذج الرسمي لكل مرحلة** (on by default) can be turned off to print everyone on the app's
@@ -488,6 +493,7 @@ except the two clean-ups noted at the end of this section.
 | Students — الجنسية | Uses the existing `students.nationality` column |
 | Settings — التحكم | New `ui_control` setting (JSON): hidden / renamed tabs, يتبع links, added tabs, texts, hidden ribbon buttons |
 | Academic years | New `academic_years` table (name, archived) and `students.academic_year_id`. The first year is made from Preferences' العام الدراسي and every existing student is put in it. The open year is the `current_academic_year_id` setting; `academic_year` follows its name |
+| Students — بيانات بيان النجاح | New `students.form_fields` (JSON of the official form's texts) |
 | Subjects — official forms | Added once (flag `synced_certificate_subjects_v1`): التربية الرياضية, المستوى الرفيع, العلوم المتكاملة, الفلسفة والمنطق, التربية المهنية, and the forms' links and marks for الإعدادية, الصف الأول الثانوي and الصف الثاني (علمي / أدبي). Links that already had marks were not changed |
 | Degrees | One degree per subject (`student_grades.score`). `score_min` is kept in the table but no longer entered; it is cleared when a student's degrees are saved again |
 

@@ -121,3 +121,57 @@ export const FORM_SIGNATURES: Record<Exclude<FormKind, "generic">, string[]> = {
   secondary: ["رئيس القسم", "مدير شئون الطلبة", "يعتمد مدير الإدارة"],
   prep: ["المراجع", "رئيس القسم", "مدير شئون الطلبة", "مدير عام الإدارة"],
 };
+
+// The official forms' texts kept with each student (البيانات الأساسية → بيانات بيان النجاح, stored
+// as JSON in students.form_fields). In the print preview each one has a checkbox: ticked, the
+// student's text is printed (or the form's own default when the student has none); unticked, the
+// form shows an empty line to fill by hand.
+export const STUDENT_FORM_FIELDS = [
+  { key: "gov", label: "المحافظة" },
+  { key: "directorate", label: "المديرية" },
+  { key: "admin", label: "الإدارة التعليمية" },
+  { key: "dept_secondary", label: "القسم (الثانوي)" },
+  { key: "dept_prep", label: "القسم (الإعدادي)" },
+  { key: "title_prep", label: "عنوان الإعدادي" },
+  { key: "round", label: "الدور" },
+  { key: "year", label: "العام" },
+  { key: "submitTo", label: "لتقديمه إلى" },
+  { key: "feeQ", label: "الرسوم (ق)" },
+  { key: "feeJ", label: "الرسوم (ج)" },
+  { key: "postal", label: "رقم الحوالة" },
+  { key: "date", label: "بتاريخ" },
+  { key: "writtenOn", label: "تحريرا في" },
+] as const;
+
+export type StudentFormFieldKey = (typeof STUDENT_FORM_FIELDS)[number]["key"];
+export type StudentFormFields = Partial<Record<StudentFormFieldKey, string>>;
+
+// Which forms print each field (the panel only offers the ones of the forms being printed).
+export const FORM_FIELD_KINDS: Record<StudentFormFieldKey, Exclude<FormKind, "generic">[]> = {
+  gov: ["secondary", "prep"],
+  directorate: ["secondary", "prep"],
+  admin: ["secondary", "prep"],
+  dept_secondary: ["secondary"],
+  dept_prep: ["prep"],
+  title_prep: ["prep"],
+  round: ["secondary", "prep"],
+  year: ["secondary", "prep"],
+  submitTo: ["secondary", "prep"],
+  feeQ: ["secondary"],
+  feeJ: ["secondary", "prep"],
+  postal: ["secondary", "prep"],
+  date: ["secondary", "prep"],
+  writtenOn: ["prep"],
+};
+
+export function parseFormFields(raw: string | null | undefined): StudentFormFields {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return Object.fromEntries(
+      STUDENT_FORM_FIELDS.filter((f) => typeof parsed[f.key] === "string").map((f) => [f.key, parsed[f.key] as string])
+    );
+  } catch {
+    return {};
+  }
+}
