@@ -9,6 +9,7 @@ import {
   Building2,
   Settings,
   Palette,
+  CalendarRange,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +41,7 @@ export const MODULES: ModuleDef[] = [
   { key: "timetable", label: "الجدول الدراسي", icon: CalendarDays, path: "/timetable", section: "studentsAffair" },
   { key: "buses", label: "الحافلات", icon: Bus, path: "/buses", section: "studentsAffair" },
   { key: "management", label: "الإدارة", icon: Building2, path: "/management", section: "hrStaff" },
+  { key: "academicYears", label: "العام الدراسي", icon: CalendarRange, path: "/academic-years", section: "studentsAffair" },
   { key: "configuration", label: "الإعدادات", icon: Settings, path: "/preferences", section: "studentsAffair" },
   { key: "controlPanel", label: "التحكم", icon: SlidersHorizontal, path: "/control", section: "studentsAffair" },
   {

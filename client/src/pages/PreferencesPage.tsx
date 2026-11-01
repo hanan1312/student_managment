@@ -253,8 +253,13 @@ export default function PreferencesPage() {
                 <input
                   value={values[f.key] ?? ""}
                   onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-100 hover:border-slate-300"
+                  // The academic year is the year opened in the العام الدراسي tab.
+                  readOnly={f.key === "academic_year"}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition read-only:bg-slate-50 read-only:text-slate-500 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 hover:border-slate-300"
                 />
+                {f.key === "academic_year" && (
+                  <p className="mt-1 text-[11px] text-slate-400">يتغير بفتح عام آخر من تبويب العام الدراسي.</p>
+                )}
               </div>
             ))}
 

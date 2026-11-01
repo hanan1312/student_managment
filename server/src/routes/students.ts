@@ -6,6 +6,7 @@ import { db } from "../db";
 import { requireAuth, type AuthedRequest } from "../auth";
 import { requireModule, getStageScope, stageOfLevel, OUT_OF_SCOPE_ERROR } from "../permissions";
 import { syncStudentPositionText } from "./classes";
+import { currentAcademicYearId } from "../academicYears";
 
 export const studentsRouter = Router();
 studentsRouter.use(requireModule("students"));
@@ -57,9 +58,16 @@ function scopeSql(req: AuthedRequest): { sql: string; params: number[] } {
   };
 }
 
-function studentLevel(id: number): { level_id: number | null } | undefined {
-  return db.prepare("SELECT level_id FROM students WHERE id = ?").get(id) as { level_id: number | null } | undefined;
+function studentLevel(id: number): { level_id: number | null; academic_year_id: number | null } | undefined {
+  return db.prepare("SELECT level_id, academic_year_id FROM students WHERE id = ?").get(id) as
+    | { level_id: number | null; academic_year_id: number | null }
+    | undefined;
 }
+
+// A screen left open from before another year was opened (العام الدراسي tab) must not change a
+// student of a year that isn't open any more.
+const OTHER_YEAR_ERROR = "هذا الطالب في عام دراسي غير المفتوح حاليًا. أعد تحميل الصفحة.";
+const inOtherYear = (row: { academic_year_id: number | null }) => row.academic_year_id !== currentAcademicYearId();
 
 function deleteLocalUpload(url: string | null | undefined) {
   if (!url || !url.startsWith("/uploads/")) return;
@@ -75,8 +83,9 @@ studentsRouter.get("/", requireAuth, (req, res) => {
     q?: string;
   };
 
-  let sql = "SELECT students.* FROM students WHERE 1=1";
-  const params: any[] = [];
+  // Only the students of the academic year the app is working in (العام الدراسي tab).
+  let sql = "SELECT students.* FROM students WHERE academic_year_id = ?";
+  const params: any[] = [currentAcademicYearId()];
 
   if (levelIds) {
     const ids = levelIds
@@ -156,8 +165,9 @@ studentsRouter.post("/", requireAuth, (req, res) => {
          status, status_date, father_name, father_national_id, father_mobile, father_job, father_education,
          father_company, father_email, mother_name, mother_national_id, mother_mobile, mother_job, mother_education,
          mother_company, mother_email, notes, medical_condition, education_authority, special_case, integrated,
-         uses_bus, emergency_name, emergency_tel, transferred_from, transferred_in, school, level_id, enrollment_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         uses_bus, emergency_name, emergency_tel, transferred_from, transferred_in, school, level_id, enrollment_type,
+         academic_year_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       maxSeq + 1,
@@ -210,7 +220,8 @@ studentsRouter.post("/", requireAuth, (req, res) => {
       b.transferredIn ?? null,
       b.school ?? null,
       b.levelId ?? levelOfClass(b.classId),
-      b.enrollmentType ?? null
+      b.enrollmentType ?? null,
+      currentAcademicYearId()
     );
 
   syncStudentPositionText();
@@ -223,6 +234,7 @@ studentsRouter.put("/:id", requireAuth, (req, res) => {
   const existing = db.prepare("SELECT * FROM students WHERE id = ?").get(id) as any;
   if (!existing) return res.status(404).json({ error: "Student not found" });
   if (!inScope(req, existing.level_id)) return res.status(403).json({ error: OUT_OF_SCOPE_ERROR });
+  if (inOtherYear(existing)) return res.status(409).json({ error: OTHER_YEAR_ERROR });
 
   const b = req.body ?? {};
   const positionError = invalidPosition(b.levelId);
@@ -399,9 +411,9 @@ studentsRouter.get("/degrees-overview", requireAuth, (req, res) => {
       .prepare(
         `SELECT id, seq_no, name, national_id, moe_code, division, section, school, level_id,
                 gender, religion, enrollment_type, nationality, birthday FROM students
-         WHERE 1=1${scopeSql(req).sql} ORDER BY seq_no ASC`
+         WHERE academic_year_id = ?${scopeSql(req).sql} ORDER BY seq_no ASC`
       )
-      .all(...scopeSql(req).params) as any[]
+      .all(currentAcademicYearId(), ...scopeSql(req).params) as any[]
   ).map((s) => ({ ...s, grades: studentGrades(s.id, s.level_id) }));
   res.json({ subjects, students });
 });
@@ -419,6 +431,7 @@ studentsRouter.put("/:id/grades", requireAuth, (req, res) => {
   const placed = studentLevel(id);
   if (!placed) return res.status(404).json({ error: "Student not found" });
   if (!inScope(req, placed.level_id)) return res.status(403).json({ error: OUT_OF_SCOPE_ERROR });
+  if (inOtherYear(placed)) return res.status(409).json({ error: OTHER_YEAR_ERROR });
   const rows = Array.isArray((req.body ?? {}).grades) ? (req.body.grades as any[]) : [];
 
   // كبرى/صغرى marks come from the subject's section (Subjects is the only place they're edited)

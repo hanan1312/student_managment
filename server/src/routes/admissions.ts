@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../db";
 import { requireAuth } from "../auth";
 import { requireModule } from "../permissions";
+import { currentAcademicYearId } from "../academicYears";
 
 export const admissionsRouter = Router();
 admissionsRouter.use(requireModule("students"));
@@ -62,10 +63,10 @@ admissionsRouter.put("/:id/approve", requireAuth, (req, res) => {
   const tx = db.transaction(() => {
     const info = db
       .prepare(
-        `INSERT INTO students (seq_no, gender, name, tel1, division, section, category, class_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO students (seq_no, gender, name, tel1, division, section, category, class_id, academic_year_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(maxSeq + 1, admission.gender, admission.name, admission.guardian_phone, division, section, "خارجى", classId);
+      .run(maxSeq + 1, admission.gender, admission.name, admission.guardian_phone, division, section, "خارجى", classId, currentAcademicYearId());
     db.prepare("UPDATE admissions SET status = 'approved' WHERE id = ?").run(id);
     return info.lastInsertRowid;
   });

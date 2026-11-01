@@ -16,7 +16,8 @@ and code are kept and can be switched back on with one setting (`SHOW_EXTENDED_F
 Visible today:
 
 - **شئون الطلاب → الطلاب**, with the ribbon buttons: طالب جديد، استيراد، تصدير، طباعة، المواد، ملف الدرجات، إضافة مدرسة، المستخدمين.
-- **الإعدادات** (Preferences), which holds the **العام الدراسي** used for students' age.
+- **العام الدراسي** (Academic years): one card per year; the open year's students are what شئون الطلاب shows (see §2a).
+- **الإعدادات** (Preferences). Its العام الدراسي now shows the open year (read-only).
 - **التحكم** (Control), next to الإعدادات (see §7).
 - **المستخدمين** (Users), opened from the Students ribbon.
 
@@ -133,6 +134,33 @@ search apply, as for Export).
   - Remove single rows from the printout with the × at the end of the row (hover). They can
     be brought back with "استعادة الصفوف المحذوفة". This only affects the printout.
 - The table header repeats on every printed page. Row numbers (م) restart for each division.
+
+---
+
+## 2a. Academic years (العام الدراسي)
+
+A tab next to التحكم. Each academic year is a card. **Students and their degrees belong to a year.**
+Everything else (المواد, المدارس, the الهيكل tree, المستخدمين, الإعدادات, التحكم, and how ملف الدرجات is
+set up) is shared by every year and is never reset when a year is added or opened.
+
+| On a card | What it does |
+|---|---|
+| **عرض بيانات العام الدراسي** (green, left) | Opens the year: the card turns green and شئون الطلاب shows that year's students. A new year starts empty; students added from then on are stored in it. On an archived card it also takes the year out of the archive |
+| **ارشيف** (red, right) | Archives the year: the card turns red and can't be opened until the green word is pressed again. Its data is kept |
+| Checkbox | Selects the year for **حذف** |
+| ✎ | Renames the year |
+
+- **اضافة عام دراسي جديد** adds a year (the next one, e.g. "2027 / 2028", is suggested).
+- **حذف** deletes the ticked years **with their students and degrees**, after a confirmation.
+- The open year can't be archived or deleted; open another year first.
+- The open year is the same for every user, and the age rule and the print headers use its name.
+  It is shown in the footer. A screen left open from before another year was opened can't change
+  students of the old year (it asks to reload).
+- The students that existed before this change are in the first card, made from the العام الدراسي
+  that was set in Preferences. A tab named "العام الدراسي" that was added earlier in التحكم was
+  replaced by this one (its hidden / يتبع / name settings were kept).
+- Who can add, open, archive or delete years: admins, the master account, and users given
+  **العام الدراسي** in إدارة الصلاحيات.
 
 ---
 
@@ -302,6 +330,28 @@ Changing the degree itself picks up the section's current marks.
 
 ### Certificate (بيان نجاح طالب)
 
+**Official forms.** Students of these stages are printed on the education administration's own
+form, laid out as the paper one:
+
+| Stage | Form | Layout |
+|---|---|---|
+| المرحلة الإعدادية (every grade) | كشف درجات طالب إعدادي (portrait) | Subjects run down: البيان, الدرجة الكلية (نهاية كبرى / صغرى), درجة الطالب, ملاحظات; المجموع after the subjects in the total |
+| الصف الأول الثانوي | اخطار بنتيجة الصف الأول الثانوي (landscape) | Subjects across, rows النهاية الكبرى / الصغرى / الدرجة; المجموع shaded before the subjects خارج المجموع |
+| الصف الثاني الثانوي → الثانوية العامة → شعبة علمي / أدبي | اخطار بنتيجة الصف الثاني الثانوي (علمي / أدبي) | As above |
+
+- Subjects are in the paper form's order. The forms' subjects were added to **المواد** and linked to
+  their sections with the forms' marks (see §8). A section whose marks were already set keeps them.
+- **Editable texts:** the header lines (المحافظة, المديرية, الإدارة, القسم), الدور, العام, رقم الجلوس,
+  اللغة الثانية, نتيجة الطالب, لتقديمه إلى, the fees (ق / ج), رقم الحوالة, بتاريخ and تحريرا في. Type
+  them in **بيانات النموذج (لكل الطلاب)** for every student, or straight on one sheet for that student
+  only. The header lines are remembered in this browser.
+- **Signatures** as on the paper: secondary رئيس القسم · مدير شئون الطلبة · يعتمد مدير الإدارة; prep
+  المراجع · رئيس القسم · مدير شئون الطلبة · مدير عام الإدارة. Each form's captions can be edited.
+- **النموذج الرسمي لكل مرحلة** (on by default) can be turned off to print everyone on the app's
+  certificate below. Other stages (رياض أطفال, الابتدائية, الصف الثالث الثانوي, البكالوريا) always use it.
+
+**The app's certificate:**
+
 - **Header:** on the right, **مديرية التربية و التعليم** and **إدارة …**: the الإدارة set for the
   student's school in **إضافة مدرسة** (shown once if its name already starts with "إدارة" or "ادارة"). Title in
   the middle, the logo on the left. **تاريخ الطباعة** is on the left of the page, under the header.
@@ -321,7 +371,12 @@ Changing the degree itself picks up the section's current marks.
 The Students print, the ملف الدرجات table print and the certificate all have a **التوقيعات**
 section. The captions (default **شئون الطلاب** and **مدير الإدارة**) can be edited, removed, or
 added to (up to 4). They are remembered in this browser for the next printout; **الافتراضي** puts
-the two defaults back. The defaults can be changed in **التحكم**. A caption saved as
+the two defaults back. The defaults can be changed in **التحكم**.
+
+**الختم (stamp):** every printout with signatures has an empty, labelled place for the stamp under
+**مدير الإدارة** (or the last signature). Drag it in the preview to move it; the dashed outline is
+only shown in the preview. Its position is remembered in this browser; **مكانه الأصلي** puts it
+back, and it can be turned off under التوقيعات. A caption saved as
 "مدير المدرسة" before the rename now shows as "مدير الإدارة". Signatures are on by default for certificates and off for the two tables.
 
 ---
@@ -355,7 +410,7 @@ Both use the same form:
 Opened with the lock icon on a user's row (admins and the master account only).
 
 - **Modules:** only the parts the app currently shows are offered: **الطلاب** (students, import,
-  export, print, subjects, degrees), **المستخدمين**, **الإعدادات** and **التحكم**. Grants for hidden modules are
+  export, print, subjects, degrees), **المستخدمين**, **العام الدراسي**, **الإعدادات** and **التحكم**. Grants for hidden modules are
   kept as they are, so turning the extended features back on loses nothing.
 - **المراحل:** **كل المراحل** (the default), or tick the stages the user manages. A user limited to
   some stages:
@@ -432,6 +487,8 @@ except the two clean-ups noted at the end of this section.
 | Students — نوع القيد | New `students.enrollment_type` (مستجد / غير مستجد) |
 | Students — الجنسية | Uses the existing `students.nationality` column |
 | Settings — التحكم | New `ui_control` setting (JSON): hidden / renamed tabs, يتبع links, added tabs, texts, hidden ribbon buttons |
+| Academic years | New `academic_years` table (name, archived) and `students.academic_year_id`. The first year is made from Preferences' العام الدراسي and every existing student is put in it. The open year is the `current_academic_year_id` setting; `academic_year` follows its name |
+| Subjects — official forms | Added once (flag `synced_certificate_subjects_v1`): التربية الرياضية, المستوى الرفيع, العلوم المتكاملة, الفلسفة والمنطق, التربية المهنية, and the forms' links and marks for الإعدادية, الصف الأول الثانوي and الصف الثاني (علمي / أدبي). Links that already had marks were not changed |
 | Degrees | One degree per subject (`student_grades.score`). `score_min` is kept in the table but no longer entered; it is cleared when a student's degrees are saved again |
 
 Clean-ups:
@@ -498,6 +555,8 @@ Clean-ups:
 | `server/src/routes/auth.ts` | Lockout (5 tries, 5 minutes); first-login password change through `/auth/reset-password` |
 | `server/src/permissions.ts` | `requireModule(...)` accepts several modules (any one is enough); `getStageScope` (stages a user may manage, `null` = all) |
 | `server/src/routes/settings.ts` | `PUT /settings/ui-control` (needs `controlPanel`) saves the التحكم configuration; the Preferences save ignores `ui_control` |
+| `server/src/academicYears.ts`, `server/src/routes/academicYears.ts` | The open year (`currentAcademicYearId`); list, add, rename, open, archive, delete. Students' list and `/degrees-overview` only return the open year |
+| `server/src/db.ts` | Also `migrateAcademicYears`, `migrateAcademicYearTab`, `syncCertificateSubjects` |
 | `server/src/routes/permissions.ts` | Modules and `stageIds` (`null` = every stage) per user |
 
 **Client**
@@ -508,11 +567,13 @@ Clean-ups:
 | `client/src/components/SchoolFormModal.tsx` | إضافة مدرسة |
 | `client/src/components/StudentDegreesEditor.tsx` | Shared per-student degrees editor |
 | `client/src/components/DegreesProfileModal.tsx` | Degrees Profile screen |
-| `client/src/components/StudentCertificateModal.tsx` | Certificate print preview (horizontal table, options) |
+| `client/src/components/StudentCertificateModal.tsx` | Certificate print preview: the official forms (`SecondaryForm`, `PrepForm`, editable `Field`s) and the app's certificate |
+| `client/src/lib/certificateForms.ts` | Which form a student gets (`certificateFormFor`), the forms' subject order and signatures |
+| `client/src/pages/AcademicYearsPage.tsx` | العام الدراسي cards |
 | `client/src/components/StudentsTable.tsx` | Students table; 50-per-page paging (`PAGE_SIZE`), reset by the page's `pageResetKey` |
 | `client/src/components/StudentsPrintModal.tsx` | Students print preview (divisions, columns, layout); print CSS in `index.css` (`.print-modal-root`, `.print-sheet`) |
 | `client/src/lib/degrees.ts` | `degreeTotals` (outside-total and choose-one rules, percentage), `passStatus` (ناجح / راسب), `autoMaxFromMin` (×2 rule for marks), print helper |
-| `client/src/components/PrintParts.tsx` | Shared print-preview pieces (modal, logo/date header, layout options, column and row controls) used by the Students print, the Degrees table print and certificates |
+| `client/src/components/PrintParts.tsx` | Shared print-preview pieces (modal, logo/date header, layout options, column and row controls, signatures and the draggable `StampBox`) used by the Students print, the Degrees table print and certificates |
 | `client/src/components/DegreesTablePrintModal.tsx` | ملف الدرجات → طباعة الكل |
 | `client/src/lib/uiControl.ts` | التحكم configuration: `useUiControl()` (`t(key)` texts, `tabLabel`, `isTabVisible`), `TEXTS` (every editable text and its default), `buildTabs`, `orderWithChildren` |
 | `client/src/pages/ControlPage.tsx`, `CustomTabPage.tsx`, `components/HiddenTab.tsx` | التحكم screen; an added tab's page (`/custom/:key`); redirect away from a hidden tab |

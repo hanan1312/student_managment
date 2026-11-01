@@ -532,6 +532,25 @@ export const api = {
 
   deleteAdmission: (token: string, id: number) => request<void>(`/admissions/${id}`, { method: "DELETE", token }),
 
+  // العام الدراسي tab: the years, the one the app works in, and (after a change) the settings,
+  // whose academic_year follows the open year.
+  getAcademicYears: (token: string) => request<import("./types").AcademicYearsResponse>("/academic-years", { token }),
+
+  createAcademicYear: (token: string, name: string) =>
+    request<import("./types").AcademicYearsResponse>("/academic-years", { method: "POST", body: JSON.stringify({ name }), token }),
+
+  renameAcademicYear: (token: string, id: number, name: string) =>
+    request<import("./types").AcademicYearsResponse>(`/academic-years/${id}`, { method: "PUT", body: JSON.stringify({ name }), token }),
+
+  openAcademicYear: (token: string, id: number) =>
+    request<import("./types").AcademicYearsResponse>(`/academic-years/${id}/open`, { method: "POST", token }),
+
+  archiveAcademicYear: (token: string, id: number) =>
+    request<import("./types").AcademicYearsResponse>(`/academic-years/${id}/archive`, { method: "POST", token }),
+
+  deleteAcademicYears: (token: string, ids: number[]) =>
+    request<import("./types").AcademicYearsResponse>("/academic-years", { method: "DELETE", body: JSON.stringify({ ids }), token }),
+
   getSchools: (token: string) => request<{ schools: import("./types").School[] }>("/schools", { token }),
 
   createSchool: (token: string, body: import("./types").SchoolInput) =>

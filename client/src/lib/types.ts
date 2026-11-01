@@ -804,3 +804,15 @@ export type HrLeaveSummaryRow = {
   employee_name: string;
   leave_days: number;
 };
+
+// العام الدراسي tab. Students belong to one year; the app works in the current one.
+export type AcademicYear = {
+  id: number;
+  name: string;
+  archived: boolean;
+  sort_order: number;
+  created_at: string;
+  student_count: number;
+};
+
+export type AcademicYearsResponse = { years: AcademicYear[]; currentId: number; settings: Record<string, string> };

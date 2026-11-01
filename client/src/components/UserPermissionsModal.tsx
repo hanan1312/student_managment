@@ -15,7 +15,8 @@ const OFFERED_MODULES = MODULES.filter((m) => SHOW_EXTENDED_FEATURES || CORE_MOD
 const MODULE_HINTS: Record<string, string> = {
   students: "الطلاب، الاستيراد والتصدير والطباعة، المواد، ملف الدرجات",
   control: "المستخدمين والنشاط والمدن والإدارات التعليمية",
-  configuration: "الإعدادات: اسم المدرسة والشعار والعام الدراسي",
+  academicYears: "العام الدراسي: إضافة الأعوام وفتحها وأرشفتها وحذفها",
+  configuration: "الإعدادات: اسم المدرسة والشعار",
   controlPanel: "التحكم: إخفاء التبويبات وتسميتها، نصوص الأزرار والطباعة، إضافة تبويبات",
 };
 

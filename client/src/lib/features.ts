@@ -4,4 +4,4 @@
 export const SHOW_EXTENDED_FEATURES = false;
 
 // Module tabs that stay visible while SHOW_EXTENDED_FEATURES is off.
-export const CORE_MODULE_KEYS = ["students", "configuration", "controlPanel", "control"];
+export const CORE_MODULE_KEYS = ["students", "academicYears", "configuration", "controlPanel", "control"];

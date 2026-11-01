@@ -15,6 +15,7 @@ import BusesPage from "./pages/BusesPage";
 import InventoryPage from "./pages/InventoryPage";
 import UsersPage from "./pages/UsersPage";
 import ControlPage from "./pages/ControlPage";
+import AcademicYearsPage from "./pages/AcademicYearsPage";
 import CustomTabPage from "./pages/CustomTabPage";
 import ManagementPage from "./pages/ManagementPage";
 import PreferencesPage from "./pages/PreferencesPage";
@@ -127,6 +128,14 @@ export default function App() {
               element={
                 <RequireModule moduleKey="controlPanel">
                   <ControlPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="academic-years"
+              element={
+                <RequireModule moduleKey="academicYears">
+                  <AcademicYearsPage />
                 </RequireModule>
               }
             />

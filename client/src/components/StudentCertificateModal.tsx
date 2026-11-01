@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useSchools } from "../context/SchoolsContext";
 import { useSettings } from "../context/SettingsContext";
-import { degreeTotals, formatDegree, formatPercentage, passStatus, splitByOutside, statusTextClass } from "../lib/degrees";
+import { degreeTotals, formatDegree, formatPercentage, PASS_LABEL, passStatus, splitByOutside, statusTextClass } from "../lib/degrees";
+import { certificateFormFor, FORM_SIGNATURES, orderGrades, type CertificateForm, type FormKind } from "../lib/certificateForms";
 import { useSignatures, type Signatures } from "../lib/print";
 import { formatMoeCode } from "../lib/studentColumns";
 import type { StudentGrade } from "../lib/types";
@@ -46,6 +47,365 @@ type CertColumn = { kind: "subject"; grade: StudentGrade } | { kind: "total" };
 // إدارة and ادارة (and أ / آ) are the same word as typed by different people.
 const normalizeAlef = (text: string) => text.replace(/[أإآ]/g, "ا").trim();
 
+// "إدارة <the administration of the student's school>" (إضافة مدرسة → الإدارة); the word isn't
+// printed twice when the name already starts with it.
+function useAdminLine(schoolName: string | null): string {
+  const { schools } = useSchools();
+  const { t } = useUiControl();
+  const school = schools.find((s) => s.name.trim() === schoolName?.trim());
+  const adminName = school?.education_admin_name?.trim() || school?.directorate?.trim() || "";
+  const adminPrefix = t("print.adminPrefix");
+  return adminName && !normalizeAlef(adminName).startsWith(normalizeAlef(adminPrefix)) ? `${adminPrefix} ${adminName}` : adminName;
+}
+
+// The editable texts of the official forms (header lines, الدور, the fees, the dates, …). A value
+// typed in the options panel is for every student; one typed on a sheet is for that student only.
+// The header lines are remembered in this browser.
+type FieldKey =
+  | "gov"
+  | "directorate"
+  | "admin"
+  | "dept_secondary"
+  | "dept_prep"
+  | "title_prep"
+  | "grade"
+  | "round"
+  | "year"
+  | "seat"
+  | "lang2"
+  | "result"
+  | "verdict"
+  | "submitTo"
+  | "feeQ"
+  | "feeJ"
+  | "postal"
+  | "date"
+  | "writtenOn";
+
+const REMEMBERED_FIELDS: FieldKey[] = ["gov", "directorate", "dept_secondary", "dept_prep", "title_prep"];
+const FIELDS_KEY = "certificate-form-fields-v1";
+
+type FieldsState = {
+  shared: Partial<Record<FieldKey, string>>;
+  perStudent: Record<number, Partial<Record<FieldKey, string>>>;
+};
+
+const FieldsContext = createContext<{
+  state: FieldsState;
+  setForStudent: (studentId: number, key: FieldKey, value: string) => void;
+} | null>(null);
+
+function loadRememberedFields(): FieldsState["shared"] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FIELDS_KEY) ?? "{}") as Record<string, unknown>;
+    return Object.fromEntries(REMEMBERED_FIELDS.filter((k) => typeof parsed[k] === "string").map((k) => [k, parsed[k] as string]));
+  } catch {
+    return {};
+  }
+}
+
+// A blank on the form: an input on a dotted line, as wide as its text. It prints as typed (or as
+// an empty dotted line to fill by hand).
+function Field({
+  studentId,
+  name,
+  fallback = "",
+  minChars = 10,
+  className = "",
+}: {
+  studentId: number;
+  name: FieldKey;
+  fallback?: string;
+  minChars?: number;
+  className?: string;
+}) {
+  const ctx = useContext(FieldsContext)!;
+  const value = ctx.state.perStudent[studentId]?.[name] ?? ctx.state.shared[name] ?? fallback;
+  return (
+    <input
+      value={value}
+      onChange={(e) => ctx.setForStudent(studentId, name, e.target.value)}
+      size={Math.max(minChars, [...value].length + 1)}
+      className={`form-field border-0 border-b border-dotted border-slate-500 bg-transparent px-1 text-center font-semibold text-slate-900 outline-none focus:bg-amber-50 ${className}`}
+    />
+  );
+}
+
+// The four header lines at the top right of both official forms.
+function FormHeaderLines({ student, dept }: { student: CertificateStudent; dept: "dept_secondary" | "dept_prep" }) {
+  const { t } = useUiControl();
+  const adminLine = useAdminLine(student.school);
+  const line = "text-start !font-bold";
+  return (
+    <div className="flex flex-col items-start gap-0.5 text-[1.05em]">
+      <Field studentId={student.id} name="gov" fallback="محافظة " minChars={14} className={line} />
+      <Field studentId={student.id} name="directorate" fallback={t("print.directorate")} minChars={14} className={line} />
+      <Field studentId={student.id} name="admin" fallback={adminLine ? `${adminLine} التعليمية` : ""} minChars={14} className={line} />
+      <Field
+        studentId={student.id}
+        name={dept}
+        fallback={dept === "dept_prep" ? "قسم شئون الطلبة والامتحانات" : "شئون الطلبة والامتحانات"}
+        minChars={14}
+        className={line}
+      />
+    </div>
+  );
+}
+
+// اخطار بنتيجة الصف … (الصف الأول الثانوي، الصف الثاني الثانوي علمي / أدبي), laid out as the paper
+// form: subjects across, the total shaded between the subjects in the total and those outside it.
+function SecondaryForm({
+  student,
+  form,
+  options,
+  signatures,
+}: {
+  student: CertificateStudent;
+  form: CertificateForm;
+  options: CertificateOptions;
+  signatures: Signatures;
+}) {
+  const { settings } = useSettings();
+  const grades = orderGrades(student.grades, form.order);
+  const totals = degreeTotals(grades);
+  const status = passStatus(totals.percentage);
+  const { inTotal, outside } = splitByOutside(grades, (g) => Boolean(g.outside_total));
+  const columns: CertColumn[] = [
+    ...inTotal.map((grade) => ({ kind: "subject" as const, grade })),
+    { kind: "total" },
+    ...outside.map((grade) => ({ kind: "subject" as const, grade })),
+  ];
+  const cell = "border border-slate-700 px-1.5 py-1.5 text-center";
+  const label = `${cell} whitespace-nowrap text-start font-bold`;
+  const row = (title: string, subjectValue: (g: StudentGrade) => string, totalValue: string) => (
+    <tr>
+      <td className={label}>{title}</td>
+      {columns.map((c) =>
+        c.kind === "total" ? (
+          <td key="total" className={`${cell} bg-slate-200 font-bold`}>
+            {totalValue}
+          </td>
+        ) : (
+          <td key={c.grade.subject_id} className={cell}>
+            {subjectValue(c.grade)}
+          </td>
+        )
+      )}
+    </tr>
+  );
+  const id = student.id;
+
+  return (
+    <div className="official-form space-y-3 border-2 border-slate-800 p-5">
+      <FormHeaderLines student={student} dept="dept_secondary" />
+
+      <p className="text-center text-[1.2em] font-bold">
+        <span className="underline underline-offset-4">اخطار بنتيجة</span>{" "}
+        <Field studentId={id} name="grade" fallback={form.gradeLabel} minChars={12} className="!text-[1em] underline underline-offset-4" /> الدور{" "}
+        <Field studentId={id} name="round" minChars={10} /> عام{" "}
+        <Field studentId={id} name="year" fallback={settings.academic_year ?? ""} minChars={12} />
+      </p>
+
+      <div className="grid grid-cols-2 gap-x-10 gap-y-1.5 text-[1.05em] font-semibold">
+        <p>
+          رقم الجلوس / <Field studentId={id} name="seat" minChars={16} />
+        </p>
+        <span />
+        <p>
+          اسم الطالب / <span className="border-b border-dotted border-slate-500 px-2 font-bold">{student.name}</span>
+        </p>
+        <span />
+        <p>
+          المدرسة / <span className="border-b border-dotted border-slate-500 px-2">{student.school || ""}</span>
+        </p>
+        <p className="text-end">
+          اللغة الثانية / <Field studentId={id} name="lang2" minChars={16} />
+        </p>
+      </div>
+
+      <table className="w-full border-collapse border-2 border-slate-800">
+        <thead>
+          <tr>
+            <th className={`${label} w-[1%]`}>البيان</th>
+            {columns.map((c) =>
+              c.kind === "total" ? (
+                <th key="total" className={`${cell} bg-slate-200 font-bold`}>
+                  المجموع
+                </th>
+              ) : (
+                <th key={c.grade.subject_id} className={`${cell} font-bold`}>
+                  {c.grade.subject_name}
+                </th>
+              )
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {options.showMax && row("النهاية الكبرى", (g) => formatDegree(g.max_degree), formatDegree(totals.max))}
+          {options.showMin && row("النهاية الصغرى", (g) => formatDegree(g.min_degree), formatDegree(totals.min))}
+          {row("الدرجة", (g) => formatDegree(g.score), totals.hasScore ? formatDegree(totals.score) : "")}
+        </tbody>
+      </table>
+
+      <div className="space-y-2 text-[1.05em] font-semibold">
+        <div className="flex flex-wrap justify-between gap-x-6 gap-y-2">
+          <p>
+            نتيجة الطالب / <Field studentId={id} name="result" fallback={status ?? ""} minChars={20} />
+          </p>
+          <p>
+            تم استخراج هذا البيان لتقديمه الى / <Field studentId={id} name="submitTo" minChars={22} />
+          </p>
+        </div>
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-2">
+          <span>بعد سداد الرسوم المقرر</span>
+          <Field studentId={id} name="feeQ" minChars={4} /> <span>ق</span>
+          <Field studentId={id} name="feeJ" minChars={4} /> <span>ج</span>
+          <span className="ms-6">بالحوالة رقم /</span>
+          <Field studentId={id} name="postal" minChars={12} />
+          <span className="ms-6">بتاريخ :</span>
+          <Field studentId={id} name="date" fallback="   /   / 20" minChars={12} />
+        </p>
+      </div>
+
+      <SignatureBlock signatures={signatures} plain />
+    </div>
+  );
+}
+
+// كشف درجات طالب إعدادي, laid out as the paper form: the subjects run down, المجموع after the
+// subjects in the total, with الدرجة الكلية (نهاية كبرى / صغرى), درجة الطالب and ملاحظات.
+function PrepForm({
+  student,
+  form,
+  options,
+  signatures,
+}: {
+  student: CertificateStudent;
+  form: CertificateForm;
+  options: CertificateOptions;
+  signatures: Signatures;
+}) {
+  const { settings } = useSettings();
+  const grades = orderGrades(student.grades, form.order);
+  const totals = degreeTotals(grades);
+  const status = passStatus(totals.percentage);
+  const { inTotal, outside } = splitByOutside(grades, (g) => Boolean(g.outside_total));
+  const cell = "border border-slate-700 px-2 py-1 text-center";
+  const label = `${cell} text-start font-bold`;
+  const marksCols = (options.showMax ? 1 : 0) + (options.showMin ? 1 : 0);
+  const subjectRow = (g: StudentGrade) => (
+    <tr key={g.subject_id}>
+      <td className={label}>{g.subject_name}</td>
+      {options.showMax && <td className={cell}>{formatDegree(g.max_degree)}</td>}
+      {options.showMin && <td className={cell}>{formatDegree(g.min_degree)}</td>}
+      <td className={`${cell} font-semibold`}>{formatDegree(g.score)}</td>
+      <td className={cell} />
+    </tr>
+  );
+  const id = student.id;
+
+  return (
+    <div className="official-form space-y-3 border-2 border-slate-800 p-5">
+      <FormHeaderLines student={student} dept="dept_prep" />
+
+      <p className="text-center">
+        <Field
+          studentId={id}
+          name="title_prep"
+          fallback="كشف درجات طالب إعدادي"
+          minChars={20}
+          className="!text-[1.3em] underline underline-offset-4"
+        />
+      </p>
+
+      <div className="space-y-2 text-[1.05em] font-semibold">
+        <p>
+          اسم الطالب / <span className="border-b border-dotted border-slate-500 px-2 font-bold">{student.name}</span>
+        </p>
+        <p className="flex flex-wrap justify-between gap-x-6">
+          <span>
+            بالكشف في سجلات مدرسة / <span className="border-b border-dotted border-slate-500 px-2">{student.school || ""}</span>
+          </span>
+          <span>
+            الصف / <Field studentId={id} name="grade" fallback={form.gradeLabel} minChars={14} />
+          </span>
+        </p>
+        <p className="flex flex-wrap justify-between gap-x-6">
+          <span>
+            وجد ان الطالب{" "}
+            <Field studentId={id} name="verdict" fallback={status === null ? "" : status === PASS_LABEL ? "ناجح" : "راسب"} minChars={6} />{" "}
+            بالدور / <Field studentId={id} name="round" minChars={12} />
+          </span>
+          <span>
+            عام / <Field studentId={id} name="year" fallback={settings.academic_year ?? ""} minChars={12} />
+          </span>
+        </p>
+        <p className="underline underline-offset-4">وبيان درجاته كالتالي /</p>
+      </div>
+
+      <table className="w-full border-collapse border-2 border-slate-800">
+        <thead>
+          <tr>
+            <th rowSpan={marksCols > 0 ? 2 : 1} className={`${cell} w-[30%] font-bold`}>
+              البيان
+            </th>
+            {marksCols > 0 && (
+              <th colSpan={marksCols} className={`${cell} font-bold`}>
+                الدرجة الكلية
+              </th>
+            )}
+            <th rowSpan={marksCols > 0 ? 2 : 1} className={`${cell} font-bold`}>
+              درجة الطالب
+            </th>
+            <th rowSpan={marksCols > 0 ? 2 : 1} className={`${cell} w-[20%] font-bold`}>
+              ملاحظات
+            </th>
+          </tr>
+          {marksCols > 0 && (
+            <tr>
+              {options.showMax && <th className={`${cell} font-bold`}>نهاية كبرى</th>}
+              {options.showMin && <th className={`${cell} font-bold`}>نهاية صغرى</th>}
+            </tr>
+          )}
+        </thead>
+        <tbody>
+          {inTotal.map(subjectRow)}
+          <tr className="bg-slate-200 font-bold">
+            <td className={label}>المجموع</td>
+            {options.showMax && <td className={cell}>{formatDegree(totals.max)}</td>}
+            {options.showMin && <td className={cell}>{formatDegree(totals.min)}</td>}
+            <td className={cell}>{totals.hasScore ? formatDegree(totals.score) : ""}</td>
+            <td className={cell} />
+          </tr>
+          {outside.map(subjectRow)}
+        </tbody>
+      </table>
+
+      <div className="space-y-2.5 text-[1.05em] font-semibold">
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-2">
+          <span>وقد استخرج هذا البيان بعد سداد الرسوم المقررة</span>
+          <Field studentId={id} name="feeJ" minChars={6} />
+          <span>ج بالحوالة البريدية رقم /</span>
+          <Field studentId={id} name="postal" minChars={16} />
+        </p>
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-2">
+          <span>بتاريخ :</span>
+          <Field studentId={id} name="date" fallback="   /   / 20" minChars={12} />
+          <span>م بناء على طلبه لتقديمها الى :</span>
+          <Field studentId={id} name="submitTo" minChars={24} />
+        </p>
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span>تحريرا في :</span>
+          <Field studentId={id} name="writtenOn" fallback="   /   / 20" minChars={12} />
+          <span>م</span>
+        </p>
+      </div>
+
+      <SignatureBlock signatures={signatures} plain />
+    </div>
+  );
+}
+
 // One student's degrees certificate. The header names the directorate and the education
 // administration of the student's school (إضافة مدرسة → الإدارة). The subjects run across (one
 // column each), with rows for النهاية الكبرى, النهاية الصغرى and الدرجة.
@@ -59,14 +419,9 @@ function Certificate({
   signatures: Signatures;
 }) {
   const { settings } = useSettings();
-  const { schools } = useSchools();
   const { t } = useUiControl();
-  const school = schools.find((s) => s.name.trim() === student.school?.trim());
-  const adminName = school?.education_admin_name?.trim() || school?.directorate?.trim() || "";
+  const adminLine = useAdminLine(student.school);
   const adminPrefix = t("print.adminPrefix");
-  // Administrations are often named "إدارة …" / "ادارة …" already; don't print the word twice.
-  const adminLine =
-    adminName && !normalizeAlef(adminName).startsWith(normalizeAlef(adminPrefix)) ? `${adminPrefix} ${adminName}` : adminName;
   const totals = degreeTotals(student.grades);
   const status = passStatus(totals.percentage);
   const cell = "border border-slate-400 px-1.5 py-1 text-center";
@@ -177,8 +532,28 @@ function Certificate({
   );
 }
 
+// The texts of the official forms that can be typed once for every student, in the options panel.
+const SHARED_FIELDS: { key: FieldKey; label: string; kinds: FormKind[] }[] = [
+  { key: "gov", label: "المحافظة", kinds: ["secondary", "prep"] },
+  { key: "directorate", label: "المديرية", kinds: ["secondary", "prep"] },
+  { key: "admin", label: "الإدارة التعليمية", kinds: ["secondary", "prep"] },
+  { key: "dept_secondary", label: "القسم (الثانوي)", kinds: ["secondary"] },
+  { key: "dept_prep", label: "القسم (الإعدادي)", kinds: ["prep"] },
+  { key: "title_prep", label: "عنوان الإعدادي", kinds: ["prep"] },
+  { key: "round", label: "الدور", kinds: ["secondary", "prep"] },
+  { key: "year", label: "العام", kinds: ["secondary", "prep"] },
+  { key: "submitTo", label: "لتقديمه إلى", kinds: ["secondary", "prep"] },
+  { key: "feeQ", label: "الرسوم (ق)", kinds: ["secondary"] },
+  { key: "feeJ", label: "الرسوم (ج)", kinds: ["secondary", "prep"] },
+  { key: "postal", label: "رقم الحوالة", kinds: ["secondary", "prep"] },
+  { key: "date", label: "بتاريخ", kinds: ["secondary", "prep"] },
+  { key: "writtenOn", label: "تحريرا في", kinds: ["prep"] },
+];
+
 // Print preview of one or more students' degrees certificates, with options like the Students
 // print: which students, which rows, layout, and one certificate per page or one after another.
+// A student in a stage with an official form (الإعدادية، الصف الأول والثاني الثانوي) gets that form
+// (lib/certificateForms.ts); the others get the app's own certificate.
 export default function StudentCertificateModal({
   students,
   onClose,
@@ -197,17 +572,78 @@ export default function StudentCertificateModal({
     showDate: true,
     showMoeCode: false,
   }));
+  const [useForms, setUseForms] = useState(true);
   const signatures = useSignatures(true);
-  const [orientation, setOrientation] = useState<Orientation>("landscape");
+  const secondarySignatures = useSignatures(true, { key: "form-secondary", defaults: FORM_SIGNATURES.secondary });
+  const prepSignatures = useSignatures(true, { key: "form-prep", defaults: FORM_SIGNATURES.prep });
+  const formOf = (s: CertificateStudent): CertificateForm =>
+    useForms ? certificateFormFor(s.division, s.section) : { kind: "generic", gradeLabel: "", order: [] };
+  // The prep form is portrait on paper; the secondary forms and the app's certificate are landscape.
+  const [orientation, setOrientation] = useState<Orientation>(() =>
+    students.every((s) => certificateFormFor(s.division, s.section).kind === "prep") ? "portrait" : "landscape"
+  );
   const [fontSize, setFontSize] = useState(12);
   const [pagePerStudent, setPagePerStudent] = useState(true);
+  const [fields, setFields] = useState<FieldsState>(() => ({ shared: loadRememberedFields(), perStudent: {} }));
+
+  useEffect(() => {
+    try {
+      const remembered = Object.fromEntries(REMEMBERED_FIELDS.filter((k) => fields.shared[k] !== undefined).map((k) => [k, fields.shared[k]]));
+      localStorage.setItem(FIELDS_KEY, JSON.stringify(remembered));
+    } catch {
+      // ignore storage failures
+    }
+  }, [fields.shared]);
 
   const printed = students.filter((s) => included.has(s.id));
+  const kinds = new Set(printed.map((s) => formOf(s).kind));
   const setOption = (key: keyof CertificateOptions) => (value: boolean) => setOptions((o) => ({ ...o, [key]: value }));
+  // Typed in the panel: for every student (replacing what was typed on single sheets).
+  const setShared = (key: FieldKey, value: string) =>
+    setFields((f) => ({
+      shared: { ...f.shared, [key]: value },
+      perStudent: Object.fromEntries(
+        Object.entries(f.perStudent).map(([id, values]) => {
+          const { [key]: _dropped, ...rest } = values;
+          return [id, rest];
+        })
+      ),
+    }));
+  const fieldsContext = {
+    state: fields,
+    setForStudent: (studentId: number, key: FieldKey, value: string) =>
+      setFields((f) => ({ ...f, perStudent: { ...f.perStudent, [studentId]: { ...f.perStudent[studentId], [key]: value } } })),
+  };
+  const sharedFields = SHARED_FIELDS.filter((f) => f.kinds.some((k) => kinds.has(k)));
 
   const optionsPanel = (
     <>
-      <TitleOption value={options.title} onChange={(title) => setOptions((o) => ({ ...o, title }))} />
+      <OptionSection label="النموذج">
+        <OptionCheckbox label="النموذج الرسمي لكل مرحلة" checked={useForms} onChange={setUseForms} />
+        <p className="px-1.5 text-[11px] leading-5 text-slate-400">
+          الإعدادي، الصف الأول الثانوي، والصف الثاني الثانوي (علمي / أدبي) تُطبع على نموذج الإدارة. باقي المراحل على الشهادة العامة.
+        </p>
+      </OptionSection>
+
+      {kinds.has("generic") && <TitleOption value={options.title} onChange={(title) => setOptions((o) => ({ ...o, title }))} />}
+
+      {sharedFields.length > 0 && (
+        <OptionSection label="بيانات النموذج (لكل الطلاب)">
+          <p className="px-1.5 text-[11px] leading-5 text-slate-400">أو اكتب مباشرة في المعاينة لطالب واحد.</p>
+          <div className="space-y-1">
+            {sharedFields.map((f) => (
+              <label key={f.key} className="flex items-center gap-2 px-1.5 text-xs text-slate-600">
+                <span className="w-24 shrink-0">{f.label}</span>
+                <input
+                  value={fields.shared[f.key] ?? ""}
+                  onChange={(e) => setShared(f.key, e.target.value)}
+                  className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
+                />
+              </label>
+            ))}
+          </div>
+        </OptionSection>
+      )}
 
       {students.length > 1 && (
         <OptionSection
@@ -246,13 +682,21 @@ export default function StudentCertificateModal({
       <OptionSection label="المحتوى">
         <OptionCheckbox label="صف النهاية الكبرى" checked={options.showMax} onChange={setOption("showMax")} />
         <OptionCheckbox label="صف النهاية الصغرى" checked={options.showMin} onChange={setOption("showMin")} />
-        <OptionCheckbox label="النسبة المئوية" checked={options.showPercentage} onChange={setOption("showPercentage")} />
-        <OptionCheckbox label="الحالة (ناجح / راسب)" checked={options.showStatus} onChange={setOption("showStatus")} />
-        <OptionCheckbox label="تاريخ الطباعة" checked={options.showDate} onChange={setOption("showDate")} />
-        <OptionCheckbox label="كود الحكومة الالكترونية" checked={options.showMoeCode} onChange={setOption("showMoeCode")} />
+        {kinds.has("generic") && (
+          <>
+            <OptionCheckbox label="النسبة المئوية" checked={options.showPercentage} onChange={setOption("showPercentage")} />
+            <OptionCheckbox label="الحالة (ناجح / راسب)" checked={options.showStatus} onChange={setOption("showStatus")} />
+            <OptionCheckbox label="تاريخ الطباعة" checked={options.showDate} onChange={setOption("showDate")} />
+            <OptionCheckbox label="كود الحكومة الالكترونية" checked={options.showMoeCode} onChange={setOption("showMoeCode")} />
+          </>
+        )}
       </OptionSection>
 
-      <SignatureOptions signatures={signatures} />
+      {kinds.has("generic") && (
+        <SignatureOptions signatures={signatures} label={kinds.size > 1 ? "التوقيعات (الشهادة العامة)" : "التوقيعات"} />
+      )}
+      {kinds.has("secondary") && <SignatureOptions signatures={secondarySignatures} label="التوقيعات (نموذج الثانوي)" />}
+      {kinds.has("prep") && <SignatureOptions signatures={prepSignatures} label="التوقيعات (نموذج الإعدادي)" />}
 
       <LayoutOptions orientation={orientation} onOrientation={setOrientation} fontSize={fontSize} onFontSize={setFontSize}>
         <OptionCheckbox label="كل شهادة في صفحة" checked={pagePerStudent} onChange={setPagePerStudent} />
@@ -260,7 +704,18 @@ export default function StudentCertificateModal({
     </>
   );
 
+  // A plain function, not a component, so typing in a sheet doesn't remount it.
+  const renderForm = (student: CertificateStudent, form: CertificateForm) =>
+    form.kind === "secondary" ? (
+      <SecondaryForm student={student} form={form} options={options} signatures={secondarySignatures} />
+    ) : form.kind === "prep" ? (
+      <PrepForm student={student} form={form} options={options} signatures={prepSignatures} />
+    ) : (
+      <Certificate student={student} options={options} signatures={signatures} />
+    );
+
   return (
+    <FieldsContext.Provider value={fieldsContext}>
     <PrintModalShell
       heading={`${options.title}${students.length > 1 ? ` (${printed.length})` : ""}`}
       orientation={orientation}
@@ -278,9 +733,10 @@ export default function StudentCertificateModal({
             i > 0 ? (pagePerStudent ? "mt-8 border-t-2 border-dashed border-slate-300 pt-8 print:mt-0 print:border-0 print:pt-0" : "mt-8 border-t border-slate-300 pt-6") : ""
           }`}
         >
-          <Certificate student={s} options={options} signatures={signatures} />
+          {renderForm(s, formOf(s))}
         </div>
       ))}
     </PrintModalShell>
+    </FieldsContext.Provider>
   );
 }

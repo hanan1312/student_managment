@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Plus, Printer, RotateCcw, X } from "lucide-react";
 import { useSettings } from "../context/SettingsContext";
 import { assetUrl } from "../lib/api";
 import { printOnlyTarget } from "../lib/degrees";
-import type { Signatures } from "../lib/print";
+import { isAdministrationManager, setStamp, useStamp, type Signatures } from "../lib/print";
 import { useUiControl } from "../lib/uiControl";
 
 // Shared pieces of the print previews (Students list, Degrees table, degrees certificates):
@@ -300,12 +300,14 @@ export function RestoreRowsButton({ count, onClick }: { count: number; onClick: 
   );
 }
 
-// Options panel: show signatures, and edit, add or remove their captions.
-export function SignatureOptions({ signatures }: { signatures: Signatures }) {
+// Options panel: show signatures, and edit, add or remove their captions; show the stamp (الختم) or
+// put it back in its place.
+export function SignatureOptions({ signatures, label = "التوقيعات" }: { signatures: Signatures; label?: string }) {
   const { names, setNames, shown, setShown, reset } = signatures;
+  const stamp = useStamp();
   return (
     <OptionSection
-      label="التوقيعات"
+      label={label}
       actions={
         <button onClick={reset} className="hover:underline">
           الافتراضي
@@ -331,7 +333,7 @@ export function SignatureOptions({ signatures }: { signatures: Signatures }) {
               </button>
             </div>
           ))}
-          {names.length < 4 && (
+          {names.length < 5 && (
             <button
               onClick={() => setNames([...names, ""])}
               className="flex items-center gap-1 px-1 text-[11px] font-medium text-brand-600 hover:underline"
@@ -340,21 +342,74 @@ export function SignatureOptions({ signatures }: { signatures: Signatures }) {
               إضافة توقيع
             </button>
           )}
+          <div className="flex items-center justify-between">
+            <OptionCheckbox label="الختم (اسحبه في المعاينة)" checked={stamp.shown} onChange={(on) => setStamp((st) => ({ ...st, shown: on }))} />
+            {(stamp.x !== 0 || stamp.y !== 0) && (
+              <button
+                onClick={() => setStamp((st) => ({ ...st, x: 0, y: 0 }))}
+                className="shrink-0 px-1 text-[11px] font-medium text-brand-600 hover:underline"
+              >
+                مكانه الأصلي
+              </button>
+            )}
+          </div>
         </div>
       )}
     </OptionSection>
   );
 }
 
-export function SignatureBlock({ signatures }: { signatures: Signatures }) {
+// الختم: an empty place for the stamp, under مدير الإدارة's signature. Drag it in the preview to
+// move it (every certificate's stamp moves together); the outline only shows in the preview.
+export function StampBox() {
+  const stamp = useStamp();
+  const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  if (!stamp.shown) return null;
+  return (
+    <div
+      className="stamp-box relative mx-auto mt-2 flex h-24 w-24 cursor-move touch-none select-none items-start justify-center rounded-full border-2 border-dashed border-slate-300 pt-1 text-[0.95em] font-semibold print:border-transparent"
+      style={{ transform: `translate(${stamp.x}px, ${stamp.y}px)` }}
+      title="اسحب لتحريك الختم"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { px: e.clientX, py: e.clientY, x: stamp.x, y: stamp.y };
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d) return;
+        setStamp((st) => ({ ...st, x: Math.round(d.x + e.clientX - d.px), y: Math.round(d.y + e.clientY - d.py) }));
+      }}
+      onPointerUp={() => (drag.current = null)}
+      onPointerCancel={() => (drag.current = null)}
+    >
+      الختم
+    </div>
+  );
+}
+
+// The signatures row. `plain` prints the captions only (as on the official result forms) instead
+// of a caption over a signature line. The stamp goes under مدير الإدارة (or the last signature).
+export function SignatureBlock({ signatures, plain = false }: { signatures: Signatures; plain?: boolean }) {
   const names = signatures.names.filter((n) => n.trim());
   if (!signatures.shown || names.length === 0) return null;
+  const managerIndex = names.findIndex(isAdministrationManager);
+  const stampIndex = managerIndex >= 0 ? managerIndex : names.length - 1;
   return (
-    <div className="signature-block grid gap-8 pt-6 text-center" style={{ gridTemplateColumns: `repeat(${names.length}, minmax(0, 1fr))` }}>
+    <div
+      className={`signature-block grid text-center ${plain ? "gap-4 pt-4 font-semibold" : "gap-8 pt-6"}`}
+      style={{ gridTemplateColumns: `repeat(${names.length}, minmax(0, 1fr))` }}
+    >
       {names.map((name, i) => (
         <div key={i}>
-          <p className="mb-8">{name}</p>
-          <p className="border-t border-slate-400 pt-1 text-[0.85em] text-slate-500">التوقيع</p>
+          {plain ? (
+            <p>{name}</p>
+          ) : (
+            <>
+              <p className="mb-8">{name}</p>
+              <p className="border-t border-slate-400 pt-1 text-[0.85em] text-slate-500">التوقيع</p>
+            </>
+          )}
+          {i === stampIndex && <StampBox />}
         </div>
       ))}
     </div>

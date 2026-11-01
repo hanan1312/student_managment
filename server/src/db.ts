@@ -199,6 +199,14 @@ db.exec(`
     value TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS academic_years (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    archived INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL,
@@ -855,6 +863,210 @@ function seedSecondaryTree() {
   })();
 }
 
+// Students belong to an academic year (العام الدراسي tab). The first time, one year is made from
+// the العام الدراسي in Preferences and every existing student is put in it. Students added without
+// a year (e.g. by older code paths) go to the current year on every start.
+function migrateAcademicYears() {
+  const cols = (db.prepare("PRAGMA table_info(students)").all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes("academic_year_id")) {
+    db.exec("ALTER TABLE students ADD COLUMN academic_year_id INTEGER REFERENCES academic_years(id)");
+  }
+  const setting = (key: string) =>
+    (db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined)?.value;
+  const upsert = db.prepare(
+    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  );
+
+  db.transaction(() => {
+    if (!db.prepare("SELECT 1 FROM academic_years").get()) {
+      const name = setting("academic_year")?.trim() || DEFAULT_SETTINGS.academic_year;
+      const id = Number(db.prepare("INSERT INTO academic_years (name, sort_order) VALUES (?, 0)").run(name).lastInsertRowid);
+      upsert.run("current_academic_year_id", String(id));
+      upsert.run("academic_year", name);
+    }
+    let currentId = Number(setting("current_academic_year_id"));
+    if (!currentId || !db.prepare("SELECT 1 FROM academic_years WHERE id = ?").get(currentId)) {
+      const year = db
+        .prepare("SELECT id, name FROM academic_years ORDER BY archived ASC, sort_order DESC, id DESC LIMIT 1")
+        .get() as { id: number; name: string };
+      currentId = year.id;
+      upsert.run("current_academic_year_id", String(year.id));
+      upsert.run("academic_year", year.name);
+    }
+    db.prepare("UPDATE students SET academic_year_id = ? WHERE academic_year_id IS NULL").run(currentId);
+  })();
+  db.exec("CREATE INDEX IF NOT EXISTS idx_students_academic_year ON students(academic_year_id)");
+}
+
+// العام الدراسي is now a built-in tab (key academicYears). A tab of that name added earlier in
+// التحكم is replaced by it: its settings (hidden, renamed, يتبع) move to the built-in tab, and
+// tabs that followed it follow the built-in one.
+function migrateAcademicYearTab() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'ui_control'").get() as { value: string } | undefined;
+  if (!row?.value) return;
+  let config: any;
+  try {
+    config = JSON.parse(row.value);
+  } catch {
+    return;
+  }
+  if (!Array.isArray(config?.customTabs)) return;
+  const normalize = (s: string) => String(s ?? "").replace(/[أإآ]/g, "ا").replace(/\s+/g, " ").trim();
+  const custom = config.customTabs.find((c: any) => normalize(c?.label) === normalize("العام الدراسي"));
+  if (!custom) return;
+
+  const tabs: Record<string, any> = config.tabs && typeof config.tabs === "object" ? config.tabs : {};
+  const own = tabs[custom.key] ?? {};
+  const { label, ...rest } = own;
+  tabs.academicYears = { ...rest, ...(label && normalize(label) !== normalize("العام الدراسي") ? { label } : {}), ...tabs.academicYears };
+  delete tabs[custom.key];
+  for (const t of Object.values(tabs)) if (t && t.parent === custom.key) t.parent = "academicYears";
+  config.tabs = tabs;
+  config.customTabs = config.customTabs.filter((c: any) => c !== custom);
+  db.prepare("UPDATE settings SET value = ? WHERE key = 'ui_control'").run(JSON.stringify(config));
+}
+
+// The subjects and marks of the official result forms (بيان نجاح طالب) for الإعدادية, الصف الأول
+// الثانوي and الصف الثاني الثانوي (علمي / أدبي). Runs once (settings flag). A subject is matched by
+// any of its names (first the ones already linked to the section, then any subject of that name);
+// a missing one is created with the first name. A link that already has marks is left as the
+// school set it; a new link, or one with no marks yet, gets the form's marks and خارج المجموع.
+type FormSubject = { names: string[]; max: number | null; min: number | null; outside?: boolean };
+
+const FORM_PREP: FormSubject[] = [
+  { names: ["اللغة العربية"], max: 80, min: 40 },
+  { names: ["اللغة الإنجليزية", "اللغة الأجنبية الأولى"], max: 60, min: 30 },
+  { names: ["الدراسات الاجتماعية", "الدراسات"], max: 40, min: 20 },
+  { names: ["الرياضيات"], max: 60, min: 30 },
+  { names: ["العلوم والصحة", "العلوم"], max: 40, min: 20 },
+  { names: ["نشاط تربوي 1", "نشاط1", "نشاط 1"], max: 20, min: 10 },
+  { names: ["نشاط تربوي 2", "نشاط2", "نشاط 2"], max: 20, min: 10 },
+  { names: ["التربية الفنية"], max: 20, min: 10, outside: true },
+  { names: ["الحاسب الآلي"], max: 20, min: 10, outside: true },
+  { names: ["التربية الدينية"], max: 40, min: 20, outside: true },
+  { names: ["التربية الرياضية"], max: 20, min: 10, outside: true },
+  { names: ["المستوى الرفيع"], max: null, min: null, outside: true },
+];
+
+const FORM_SECONDARY_OUTSIDE = (wataniaMin: number): FormSubject[] => [
+  { names: ["التربية الدينية"], max: 40, min: 20, outside: true },
+  { names: ["اللغة الأجنبية الثانية", "اللغة الثانية"], max: 40, min: 20, outside: true },
+  { names: ["التربية الوطنية"], max: 20, min: wataniaMin, outside: true },
+  { names: ["التربية المهنية"], max: 20, min: 10, outside: true },
+];
+
+const FORM_SEC1: FormSubject[] = [
+  { names: ["اللغة العربية"], max: 80, min: 40 },
+  { names: ["اللغة الأجنبية الأولى", "اللغة الإنجليزية"], max: 60, min: 30 },
+  { names: ["الرياضيات"], max: 60, min: 30 },
+  { names: ["العلوم المتكاملة", "علوم متكاملة"], max: 60, min: 30 },
+  { names: ["التاريخ"], max: 60, min: 30 },
+  { names: ["الفلسفة والمنطق"], max: 60, min: 30 },
+  ...FORM_SECONDARY_OUTSIDE(5),
+];
+
+const FORM_SEC2_SCI: FormSubject[] = [
+  { names: ["اللغة العربية"], max: 80, min: 40 },
+  { names: ["اللغة الأجنبية الأولى", "اللغة الإنجليزية"], max: 60, min: 30 },
+  { names: ["الرياضيات"], max: 60, min: 30 },
+  { names: ["الكيمياء"], max: 60, min: 30 },
+  { names: ["التاريخ"], max: 60, min: 30 },
+  { names: ["الفيزياء"], max: 60, min: 30 },
+  ...FORM_SECONDARY_OUTSIDE(10),
+];
+
+const FORM_SEC2_LIT: FormSubject[] = [
+  { names: ["اللغة العربية"], max: 80, min: 40 },
+  { names: ["اللغة الأجنبية الأولى", "اللغة الإنجليزية"], max: 60, min: 30 },
+  { names: ["رياضيات عامة", "الرياضيات"], max: 60, min: 30 },
+  { names: ["الجغرافيا"], max: 60, min: 30 },
+  { names: ["التاريخ"], max: 60, min: 30 },
+  { names: ["علم النفس والاجتماع", "علم النفس"], max: 60, min: 30 },
+  ...FORM_SECONDARY_OUTSIDE(5),
+];
+
+// Arabic names as typed by different people: أ/إ/آ = ا, ى = ي, ة = ه, Arabic digits, no spaces.
+function looseName(text: string): string {
+  return String(text ?? "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[\sـ]+/g, "");
+}
+
+function syncCertificateSubjects() {
+  const FLAG = "synced_certificate_subjects_v1";
+  if (db.prepare("SELECT 1 FROM settings WHERE key = ?").get(FLAG)) return;
+
+  type LevelRow = { id: number; stage_id: number; parent_id: number | null; name: string };
+  const levels = db.prepare("SELECT id, stage_id, parent_id, name FROM levels").all() as LevelRow[];
+  const stages = db.prepare("SELECT id, name FROM stages").all() as { id: number; name: string }[];
+  const byId = new Map(levels.map((l) => [l.id, l]));
+  const isLeaf = (l: LevelRow) => !levels.some((c) => c.parent_id === l.id);
+  // The level's names from the top of its branch down, loosely spelled.
+  const pathOf = (l: LevelRow) => {
+    const names: string[] = [];
+    for (let n: LevelRow | undefined = l; n; n = n.parent_id ? byId.get(n.parent_id) : undefined) names.unshift(looseName(n.name));
+    return names;
+  };
+  const prepStages = new Set(stages.filter((s) => looseName(s.name).includes("اعدادي")).map((s) => s.id));
+  const secStages = new Set(stages.filter((s) => looseName(s.name).includes("ثانوي")).map((s) => s.id));
+
+  const targets: [LevelRow[], FormSubject[]][] = [
+    [levels.filter((l) => prepStages.has(l.stage_id) && isLeaf(l)), FORM_PREP],
+    [levels.filter((l) => secStages.has(l.stage_id) && isLeaf(l) && pathOf(l)[0] === looseName("الصف الأول الثانوي")), FORM_SEC1],
+    [
+      levels.filter((l) => {
+        const p = pathOf(l);
+        return secStages.has(l.stage_id) && isLeaf(l) && p[0] === looseName("الصف الثاني الثانوي") && p.includes(looseName("الثانوية العامة (نظام جديد)")) && p[p.length - 1] === looseName("شعبة علمي");
+      }),
+      FORM_SEC2_SCI,
+    ],
+    [
+      levels.filter((l) => {
+        const p = pathOf(l);
+        return secStages.has(l.stage_id) && isLeaf(l) && p[0] === looseName("الصف الثاني الثانوي") && p.includes(looseName("الثانوية العامة (نظام جديد)")) && p[p.length - 1] === looseName("شعبة أدبي");
+      }),
+      FORM_SEC2_LIT,
+    ],
+  ];
+
+  db.transaction(() => {
+    const subjects = () => db.prepare("SELECT id, name FROM subjects ORDER BY id").all() as { id: number; name: string }[];
+    for (const [levelRows, form] of targets) {
+      for (const level of levelRows) {
+        const linked = db
+          .prepare("SELECT sl.subject_id, s.name, sl.max_degree FROM subject_levels sl JOIN subjects s ON s.id = sl.subject_id WHERE sl.level_id = ?")
+          .all(level.id) as { subject_id: number; name: string; max_degree: number | null }[];
+        for (const item of form) {
+          const loose = item.names.map(looseName);
+          const link = loose.map((n) => linked.find((l) => looseName(l.name) === n)).find(Boolean);
+          if (link) {
+            if (link.max_degree === null) {
+              db.prepare("UPDATE subject_levels SET max_degree = ?, min_degree = ?, outside_total = ? WHERE subject_id = ? AND level_id = ?").run(
+                item.max,
+                item.min,
+                item.outside ? 1 : 0,
+                link.subject_id,
+                level.id
+              );
+            }
+            continue;
+          }
+          const all = subjects();
+          const found = loose.map((n) => all.find((s) => looseName(s.name) === n)).find(Boolean);
+          const subjectId = found?.id ?? Number(db.prepare("INSERT INTO subjects (name) VALUES (?)").run(item.names[0]).lastInsertRowid);
+          db.prepare(
+            "INSERT INTO subject_levels (subject_id, level_id, max_degree, min_degree, outside_total) VALUES (?, ?, ?, ?, ?)"
+          ).run(subjectId, level.id, item.max, item.min, item.outside ? 1 : 0);
+        }
+      }
+    }
+    db.prepare("INSERT INTO settings (key, value) VALUES (?, '1')").run(FLAG);
+  })();
+}
+
 function migrateDailyPeriodsColumns() {
   const existing = (db.prepare("PRAGMA table_info(daily_periods)").all() as { name: string }[]).map((c) => c.name);
   if (!existing.includes("is_break")) {
@@ -1174,6 +1386,9 @@ seedDailyPeriods();
 seedSettings();
 seedSchools();
 seedSecondaryTree();
+migrateAcademicYears();
+migrateAcademicYearTab();
+syncCertificateSubjects();
 
 // Backfills the default org tree for any school that predates this feature (created before
 // seedHrOrgTree existed) — a fresh school always gets one via seedSchools()/POST /schools,

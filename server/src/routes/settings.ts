@@ -84,7 +84,9 @@ settingsRouter.put("/", requireAuth, requireModule("configuration"), (req, res) 
   });
   // ui_control belongs to the التحكم tab (below); the Preferences form sends every setting back,
   // so a stale copy of it must not overwrite the Control tab's.
-  tx(Object.entries(b).filter(([key]) => key !== UI_CONTROL_KEY));
+  // The academic year is opened in the العام الدراسي tab (routes/academicYears.ts), which keeps
+  // academic_year equal to the open year's name.
+  tx(Object.entries(b).filter(([key]) => key !== UI_CONTROL_KEY && key !== "academic_year" && key !== "current_academic_year_id"));
 
   res.json({ settings: allSettings() });
 });
