@@ -1,8 +1,9 @@
 import type { StudentGrade } from "./types";
 
 // The official result forms (بيان نجاح طالب) the education administration uses, one per stage:
-//  - "secondary": اخطار بنتيجة … — الصف الأول الثانوي and الصف الثاني الثانوي (علمي / أدبي). The
-//    subjects run across with rows for النهاية الكبرى / الصغرى / الدرجة.
+//  - "secondary": اخطار بنتيجة … — every section of المرحلة الثانوية (the photographed forms of
+//    الصف الأول and الصف الثاني علمي / أدبي, and the same form for البكالوريا المصرية and الصف
+//    الثالث). The subjects run across with rows for النهاية الكبرى / الصغرى / الدرجة.
 //  - "prep": كشف درجات طالب إعدادي — the subjects run down, with الدرجة الكلية (كبرى / صغرى),
 //    درجة الطالب and ملاحظات.
 //  - "generic": the app's own certificate, for every other stage.
@@ -36,6 +37,9 @@ const SECONDARY_OUTSIDE = [
 ];
 
 const ORDER = {
+  // Sections without a paper form of their own: the language subjects first, the usual
+  // خارج المجموع subjects in the form's order; the rest keep the order of المواد.
+  secondary: [["اللغة العربية"], ["اللغة الأجنبية الأولى", "اللغة الإنجليزية"], ...SECONDARY_OUTSIDE],
   prep: [
     ["اللغة العربية"],
     ["اللغة الإنجليزية", "اللغة الأجنبية الأولى"],
@@ -90,6 +94,7 @@ export function certificateFormFor(division: string | null, section: string | nu
     if (path.length === 1 && path[0] === looseName("الصف الأول الثانوي")) {
       return { kind: "secondary", gradeLabel: grade, order: ORDER.sec1 };
     }
+    const parts = (section ?? "").split("/").map((p) => p.trim()).filter(Boolean);
     const amma = path[0] === looseName("الصف الثاني الثانوي") && path.includes(looseName("الثانوية العامة (نظام جديد)"));
     const track = path[path.length - 1];
     if (amma && track === looseName("شعبة علمي")) {
@@ -98,6 +103,15 @@ export function certificateFormFor(division: string | null, section: string | nu
     if (amma && track === looseName("شعبة أدبي")) {
       return { kind: "secondary", gradeLabel: `${grade} (أدبي)`, order: ORDER.sec2Literary };
     }
+    // Every other section of the stage (البكالوريا المصرية's tracks, الصف الثالث الثانوي, …) uses the
+    // same form: the track in brackets ("شعبة علمي" → "علمي"), البكالوريا named before it.
+    const trackName = parts.length > 1 ? parts[parts.length - 1].replace(/^شعبة\s+/, "") : "";
+    const system = parts.length > 2 && looseName(parts[1]).includes(looseName("البكالوريا")) ? ` - ${parts[1]}` : "";
+    return {
+      kind: "secondary",
+      gradeLabel: `${grade}${system}${trackName ? ` (${trackName})` : ""}`,
+      order: ORDER.secondary,
+    };
   }
   return { kind: "generic", gradeLabel: grade, order: [] };
 }

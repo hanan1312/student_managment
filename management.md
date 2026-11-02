@@ -338,6 +338,7 @@ form, laid out as the paper one:
 | المرحلة الإعدادية (every grade) | كشف درجات طالب إعدادي (portrait) | Subjects run down: البيان, الدرجة الكلية (نهاية كبرى / صغرى), درجة الطالب, ملاحظات; المجموع after the subjects in the total |
 | الصف الأول الثانوي | اخطار بنتيجة الصف الأول الثانوي (landscape) | Subjects across, rows النهاية الكبرى / الصغرى / الدرجة; المجموع shaded before the subjects خارج المجموع |
 | الصف الثاني الثانوي → الثانوية العامة → شعبة علمي / أدبي | اخطار بنتيجة الصف الثاني الثانوي (علمي / أدبي) | As above |
+| Every other section of المرحلة الثانوية (البكالوريا المصرية's tracks in الصف الثاني and الثالث, الصف الثالث الثانوي العامة's شعب) | The same اخطار بنتيجة form, titled e.g. "الصف الثالث الثانوي (الرياضيات)" or "الصف الثاني الثانوي - البكالوريا المصرية (الأعمال)" | As above, with the section's subjects from المواد |
 
 - Subjects are in the paper form's order. The forms' subjects were added to **المواد** and linked to
   their sections with the forms' marks (see §8). A section whose marks were already set keeps them.
@@ -355,7 +356,7 @@ form, laid out as the paper one:
 - **Signatures** as on the paper: secondary رئيس القسم · مدير شئون الطلبة · يعتمد مدير الإدارة; prep
   المراجع · رئيس القسم · مدير شئون الطلبة · مدير عام الإدارة. Each form's captions can be edited.
 - **النموذج الرسمي لكل مرحلة** (on by default) can be turned off to print everyone on the app's
-  certificate below. Other stages (رياض أطفال, الابتدائية, الصف الثالث الثانوي, البكالوريا) always use it.
+  certificate below. Other stages (رياض أطفال, الابتدائية) always use it.
 
 **The app's certificate:**
 

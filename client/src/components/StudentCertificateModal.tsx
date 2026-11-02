@@ -617,7 +617,7 @@ export default function StudentCertificateModal({
       <OptionSection label="النموذج">
         <OptionCheckbox label="النموذج الرسمي لكل مرحلة" checked={useForms} onChange={setUseForms} />
         <p className="px-1.5 text-[11px] leading-5 text-slate-400">
-          الإعدادي، الصف الأول الثانوي، والصف الثاني الثانوي (علمي / أدبي) تُطبع على نموذج الإدارة. باقي المراحل على الشهادة العامة.
+          المرحلة الإعدادية والمرحلة الثانوية (كل الصفوف والشعب والبكالوريا) تُطبع على نموذج الإدارة. باقي المراحل على الشهادة العامة.
         </p>
       </OptionSection>
 
