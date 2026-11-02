@@ -100,6 +100,12 @@ function loadHiddenFields(): Set<string> {
   }
 }
 
+// تحريرا في: the day the form is printed, as d / m / yyyy.
+function todayText(): string {
+  const d = new Date();
+  return `${d.getDate()} / ${d.getMonth() + 1} / ${d.getFullYear()}`;
+}
+
 // A blank on the form: an input on a dotted line, as wide as its text. It prints as typed (or as
 // an empty dotted line to fill by hand).
 function Field({
@@ -261,7 +267,7 @@ function SecondaryForm({
           <span className="ms-6">بالحوالة رقم /</span>
           <Field studentId={id} name="postal" minChars={12} />
           <span className="ms-6">بتاريخ :</span>
-          <Field studentId={id} name="date" fallback="   /   / 20" minChars={12} />
+          <Field studentId={id} name="date" fallback={`   /   / ${new Date().getFullYear()}`} minChars={12} />
         </p>
       </div>
 
@@ -388,13 +394,13 @@ function PrepForm({
         </p>
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-2">
           <span>بتاريخ :</span>
-          <Field studentId={id} name="date" fallback="   /   / 20" minChars={12} />
+          <Field studentId={id} name="date" fallback={`   /   / ${new Date().getFullYear()}`} minChars={12} />
           <span>م بناء على طلبه لتقديمها الى :</span>
           <Field studentId={id} name="submitTo" minChars={24} />
         </p>
         <p className="flex flex-wrap items-baseline gap-x-2">
           <span>تحريرا في :</span>
-          <Field studentId={id} name="writtenOn" fallback="   /   / 20" minChars={12} />
+          <Field studentId={id} name="writtenOn" fallback={todayText()} minChars={12} />
           <span>م</span>
         </p>
       </div>

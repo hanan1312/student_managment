@@ -348,6 +348,8 @@ form, laid out as the paper one:
   ticked, the student's text is printed, or the form's default when the student has none (the open
   year, the school's administration, التحكم's المديرية, the forms' own titles); unticked, an empty
   line to fill by hand. The choice is remembered in this browser.
+- With no saved text, **بتاريخ** prints `  /   / <this year>` (day and month left to fill by hand) and
+  **تحريرا في** prints the day the form is printed (d / m / yyyy).
 - Any text (also رقم الجلوس, اللغة الثانية, نتيجة الطالب) can still be typed straight on a sheet, for
   that printout only.
 - **Signatures** as on the paper: secondary رئيس القسم · مدير شئون الطلبة · يعتمد مدير الإدارة; prep
