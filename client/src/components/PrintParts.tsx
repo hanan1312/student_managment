@@ -36,7 +36,10 @@ export function PrintModalShell({
 }) {
   return createPortal(
     <div className="print-modal-root animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm">
-      <style>{`@media print { @page { size: A4 ${orientation}; margin: 10mm; } }`}</style>
+      {/* No page margin: the browser prints its own header and footer (the page's address, title
+          and date) inside the margin, so without one they aren't printed. The sheet's padding
+          (index.css, .print-sheet) keeps the 10mm on every page instead. */}
+      <style>{`@media print { @page { size: A4 ${orientation}; margin: 0; } }`}</style>
       <div className="animate-rise-in flex h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="print-hidden flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-4">
           <div>

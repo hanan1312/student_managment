@@ -5,6 +5,7 @@ import { api, ApiError, assetUrl } from "../lib/api";
 import { applyThemePalette } from "../lib/themePalettes";
 import BackgroundWatermark from "../components/BackgroundWatermark";
 import LoginChangePasswordModal from "../components/LoginChangePasswordModal";
+import Copyright from "../components/Copyright";
 
 function LampIllustration() {
   return (
@@ -252,6 +253,10 @@ export default function LoginPage() {
           </form>
         </div>
       </div>
+
+      <footer className="absolute inset-x-0 bottom-0 flex justify-center px-4 py-3 text-[11px] text-white/40">
+        <Copyright />
+      </footer>
 
       {changePasswordOpen && (
         <LoginChangePasswordModal initialUsername={username} onClose={() => setChangePasswordOpen(false)} />

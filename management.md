@@ -23,6 +23,13 @@ Visible today:
 
 The whole interface is in **Arabic** and laid out **right-to-left**.
 
+**Copyright:** every screen's footer (and the sign-in page) shows "جميع الحقوق محفوظة · © <year>
+TalentX Innovations". It isn't printed.
+
+**Printing:** printouts have no page margin, so the browser doesn't add its own header and footer
+(the page's address, title and date) to the PDF; the sheet keeps a 10 mm border of its own on
+every page.
+
 **Moving table columns (optional):** in the app's tables (not print previews or the per-student
 degrees editor), drag a column's header onto another header to
 move that column there. Nothing changes until someone drags. The order is remembered per table in

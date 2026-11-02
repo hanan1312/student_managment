@@ -12,6 +12,7 @@ import { orderWithChildren, useUiControl, type AppTab } from "../lib/uiControl";
 import BackgroundWatermark from "./BackgroundWatermark";
 import ChangePasswordModal from "./ChangePasswordModal";
 import { roleLabel } from "./SystemUserModal";
+import Copyright from "./Copyright";
 
 function sectionForPath(tabs: AppTab[], pathname: string): SectionKey {
   const match = tabs.find((m) => m.path === pathname || (m.path !== "/" && pathname.startsWith(m.path)));
@@ -40,8 +41,12 @@ function StatusFooter({ userLabel, licenseTo, academicYear }: { userLabel: strin
       <span className="hidden sm:inline">
         مرخص لـ: {licenseTo} &middot; {academicYear} &middot; v1.0.0
       </span>
-      <span>
-        المستخدم: <span className="font-medium text-slate-700">{userLabel}</span>
+      <span className="flex items-center gap-3">
+        <span>
+          المستخدم: <span className="font-medium text-slate-700">{userLabel}</span>
+        </span>
+        <span className="hidden h-3 w-px bg-slate-200 md:inline-block" />
+        <Copyright className="hidden text-slate-400 md:inline-flex" />
       </span>
     </footer>
   );

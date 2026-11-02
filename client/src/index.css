@@ -192,6 +192,16 @@ body {
 }
 
 @media print {
+  /* No page margin anywhere, so the browser doesn't print its header and footer (the page's
+     address, title and date) on the page; the printed content keeps 10mm of its own instead. */
+  @page {
+    margin: 0;
+  }
+  body:not(.printing-only) .print-area {
+    padding: 10mm;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
   body * {
     visibility: hidden;
   }
@@ -236,7 +246,10 @@ body {
   }
   .print-sheet {
     width: 100% !important;
-    padding: 0 !important;
+    /* The page margin (the page itself has none; see PrintModalShell), repeated on every printed page. */
+    padding: 10mm !important;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
