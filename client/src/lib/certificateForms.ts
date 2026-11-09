@@ -178,6 +178,22 @@ export const FORM_FIELD_KINDS: Record<StudentFormFieldKey, Exclude<FormKind, "ge
   writtenOn: ["prep"],
 };
 
+// الدور: chosen like الديانة in the student's ملف الدرجات and kept as the forms' "round" text, so
+// the forms print it ("الدور الأول عام", "بالدور / الأول").
+export const EXAM_ROUNDS = ["الأول", "الثاني"] as const;
+
+// Typed variants (اول، أول، الدور الأول، 1 / ثاني، ثان، 2) read as الأول / الثاني; anything else is kept.
+export function normalizeRound(raw: string | undefined): string | undefined {
+  const v = raw?.trim();
+  if (!v) return undefined;
+  const word = v.replace(/^الدور\s*/, "").replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/^ال/, "");
+  if (["اول", "1", "١"].includes(word)) return "الأول";
+  if (["ثاني", "ثان", "2", "٢"].includes(word)) return "الثاني";
+  return v;
+}
+
+export const studentRound = (formFields: string | null | undefined) => parseFormFields(formFields).round ?? "";
+
 export function parseFormFields(raw: string | null | undefined): StudentFormFields {
   if (!raw) return {};
   try {

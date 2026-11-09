@@ -2,14 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { Printer } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
-import { degreeTotals, formatDegree, formatPercentage, passStatus, statusBadgeClass } from "../lib/degrees";
+import { degreeTotals, formatDegree, formatPercentage, passStatus, roundDegree, statusBadgeClass } from "../lib/degrees";
 import type { StudentGrade } from "../lib/types";
+import { EXAM_ROUNDS, parseFormFields, studentRound } from "../lib/certificateForms";
 import { inputCls } from "./FormLayout";
 import StudentCertificateModal, { type CertificateStudent } from "./StudentCertificateModal";
 
 
 const toText = (n: number | null) => (n === null ? "" : String(n));
-const toNum = (v: string | undefined) => (!v || v.trim() === "" || Number.isNaN(Number(v)) ? null : Number(v));
+// A typed degree counts to two decimals, as it's saved.
+const toNum = (v: string | undefined) => (!v || v.trim() === "" || Number.isNaN(Number(v)) ? null : roundDegree(Number(v)));
 
 // A student's Degrees Profile: per subject the كبرى/صغرى marks (set only in Subjects, for the
 // student's section) and the student's degree (one value, out of the كبرى). Used by the student form's Degrees
@@ -17,9 +19,12 @@ const toNum = (v: string | undefined) => (!v || v.trim() === "" || Number.isNaN(
 export default function StudentDegreesEditor({
   student,
   onSaved,
+  onRoundSaved,
 }: {
   student: Omit<CertificateStudent, "grades">;
   onSaved?: () => void;
+  // الدور once it's saved, for a caller holding the student's form texts (the student form).
+  onRoundSaved?: (round: string) => void;
 }) {
   const { token } = useAuth();
   const [grades, setGrades] = useState<StudentGrade[]>([]);
@@ -29,6 +34,8 @@ export default function StudentDegreesEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
+  // الدور (الأول / الثاني), saved with the degrees; clicking the chosen one again clears it.
+  const [round, setRound] = useState(() => studentRound(student.form_fields));
 
   useEffect(() => {
     if (!token) return;
@@ -74,9 +81,11 @@ export default function StudentDegreesEditor({
       await api.saveStudentGrades(
         token,
         student.id,
-        liveGrades.map((g) => ({ subjectId: g.subject_id, score: g.score, scoreMin: null }))
+        liveGrades.map((g) => ({ subjectId: g.subject_id, score: g.score, scoreMin: null })),
+        round
       );
       setMessage("تم حفظ الدرجات.");
+      onRoundSaved?.(round);
       onSaved?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "تعذر حفظ الدرجات.");
@@ -89,6 +98,26 @@ export default function StudentDegreesEditor({
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-medium text-slate-500">الدور</span>
+        <div className="flex h-[34px] w-56 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
+          {EXAM_ROUNDS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRound((cur) => (cur === r ? "" : r))}
+              className={`flex-1 rounded-md py-1 text-sm font-medium transition ${
+                round === r ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        {round && !(EXAM_ROUNDS as readonly string[]).includes(round) && (
+          <span className="text-xs text-slate-400">({round})</span>
+        )}
+      </div>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-slate-100 text-sm">
           <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
@@ -197,7 +226,7 @@ export default function StudentDegreesEditor({
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving || loading || grades.length === 0}
+          disabled={saving || loading}
           className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-xs font-medium text-white transition hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-md active:translate-y-0 disabled:opacity-60"
         >
           {saving ? "جارٍ الحفظ…" : "حفظ الدرجات"}
@@ -205,7 +234,13 @@ export default function StudentDegreesEditor({
       </div>
 
       {printOpen && (
-        <StudentCertificateModal students={[{ ...student, grades: liveGrades }]} onClose={() => setPrintOpen(false)} />
+        <StudentCertificateModal students={[
+            {
+              ...student,
+              form_fields: JSON.stringify({ ...parseFormFields(student.form_fields), round: round || undefined }),
+              grades: liveGrades,
+            },
+          ]} onClose={() => setPrintOpen(false)} />
       )}
     </div>
   );

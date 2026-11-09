@@ -11,6 +11,9 @@ export type DegreeTotals = {
   percentage: number | null;
 };
 
+// Degrees and their sums are kept to two decimals (as the server saves them).
+export const roundDegree = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 // Subjects خارج المجموع are left out entirely. In a choose-one group the student studies one
 // subject, so only the graded member's marks count (or one member's, before any is graded).
 // The server's students list uses the same rule (server/src/routes/students.ts, degreeSummary).
@@ -27,12 +30,12 @@ export function degreeTotals(grades: StudentGrade[]): DegreeTotals {
   });
 
   const sum = (rows: StudentGrade[], f: (g: StudentGrade) => number) => rows.reduce((t, g) => t + f(g), 0);
-  const max = sum(marksRows, (g) => g.max_degree ?? 0);
-  const score = sum(counted, (g) => g.score ?? 0);
+  const max = roundDegree(sum(marksRows, (g) => g.max_degree ?? 0));
+  const score = roundDegree(sum(counted, (g) => g.score ?? 0));
   const hasScore = counted.some(graded);
   return {
     max,
-    min: sum(marksRows, (g) => g.min_degree ?? 0),
+    min: roundDegree(sum(marksRows, (g) => g.min_degree ?? 0)),
     score,
     hasScore,
     percentage: hasScore && max > 0 ? Math.round((1000 * score) / max) / 10 : null,

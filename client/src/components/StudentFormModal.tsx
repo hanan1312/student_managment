@@ -760,7 +760,8 @@ export default function StudentFormModal({ tree, initial, onClose, onSubmit }: P
                 <Section title="بيانات بيان النجاح" icon={FileText}>
                   {/* Printed on the official result form (بيان نجاح طالب) when ticked in its preview.
                       Empty: the form's own default (e.g. the year, the school's administration). */}
-                  {STUDENT_FORM_FIELDS.map((f) => (
+                  {/* الدور is chosen in ملف الدرجات. */}
+                  {STUDENT_FORM_FIELDS.filter((f) => f.key !== "round").map((f) => (
                     <Field key={f.key} label={f.label}>
                       <input
                         value={formFields[f.key] ?? ""}
@@ -1052,7 +1053,10 @@ export default function StudentFormModal({ tree, initial, onClose, onSubmit }: P
 
           {tab === "degrees" &&
             (initial ? (
-              <StudentDegreesEditor student={initial} />
+              <StudentDegreesEditor
+                student={{ ...initial, form_fields: JSON.stringify(formFields) }}
+                onRoundSaved={(round) => setFormFields((v) => ({ ...v, round: round || undefined }))}
+              />
             ) : (
               <ComingSoon label="احفظ الطالب أولًا، ثم ملف الدرجات" />
             ))}

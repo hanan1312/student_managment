@@ -1,6 +1,7 @@
 import type { Student } from "./types";
 import { SHOW_EXTENDED_FEATURES } from "./features";
 import { passStatus } from "./degrees";
+import { studentRound } from "./certificateForms";
 
 export type StudentColumnKey =
   | "gender"
@@ -51,6 +52,7 @@ export type StudentColumnKey =
   | "transferred_in"
   | "school"
   | "enrollment_type"
+  | "exam_round"
   | "total_degrees"
   | "percentage"
   | "pass_status";
@@ -93,6 +95,8 @@ const ALL_STUDENT_COLUMNS: StudentColumnDef[] = [
   { key: "section", label: "الصف", defaultVisible: true, get: (s) => s.section ?? "" },
   { key: "school", label: "المدرسة", defaultVisible: true, get: (s) => s.school ?? "" },
   { key: "enrollment_type", label: "نوع القيد", defaultVisible: false, get: (s) => s.enrollment_type ?? "" },
+  // الدور (الأول / الثاني), set in the student's ملف الدرجات.
+  { key: "exam_round", label: "الدور", defaultVisible: false, get: (s) => studentRound(s.form_fields) },
   {
     key: "total_degrees",
     label: "مجموع الدرجات",
@@ -157,6 +161,7 @@ const CORE_COLUMN_KEYS: StudentColumnKey[] = [
   "school",
   "religion",
   "enrollment_type",
+  "exam_round",
   "nationality",
   "total_degrees",
   "percentage",

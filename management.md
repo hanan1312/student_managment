@@ -294,7 +294,13 @@ On the student's **ملف الدرجات** tab, or by clicking a student's row i
 - Each subject shows the section's **النهايات** (كبرى / صغرى, read-only) and **one degree** box
   (الدرجة), out of the كبرى mark. (The earlier separate صغرى degree is no longer entered or shown.)
 - A degree higher than the كبرى mark is shown in red and is refused on save.
+- Degrees are kept to **two decimals**: a typed or imported 45.666 is saved as 45.67, and مجموع
+  الدرجات is rounded the same way. Degrees saved before this were rounded once.
 - Totals: **مجموع الدرجات**, **النسبة المئوية** and **الحالة**.
+- **الدور:** الأول / الثاني, chosen like الديانة above the subjects (click the chosen one again to
+  clear it) and saved with **حفظ الدرجات**. It is the same الدور the official result forms print, and
+  a column (off until ticked) in the Students table, ملف الدرجات and Export. Import reads a الدور
+  column: اول / أول / 1 → الأول, ثاني / ثان / 2 → الثاني.
 - **طباعة الشهادة** opens the certificate print preview (see below).
 
 ### Percentage
@@ -389,8 +395,9 @@ form, laid out as the paper one:
 - Subjects are in the paper form's order. The forms' subjects were added to **المواد** and linked to
   their sections with the forms' marks (see §8). A section whose marks were already set keeps them.
 - **The form's texts are student data:** البيانات الأساسية → **بيانات بيان النجاح** holds المحافظة,
-  المديرية, الإدارة التعليمية, القسم (الثانوي / الإعدادي), عنوان الإعدادي, الدور, العام, لتقديمه إلى,
-  الرسوم (ق / ج), رقم الحوالة, بتاريخ and تحريرا في for each student.
+  المديرية, الإدارة التعليمية, القسم (الثانوي / الإعدادي), عنوان الإعدادي, العام, لتقديمه إلى,
+  الرسوم (ق / ج), رقم الحوالة, بتاريخ and تحريرا في for each student. الدور is chosen in the
+  student's ملف الدرجات (see §5).
 - **بيانات النموذج** in the preview has a checkbox per field (only those of the forms being printed):
   ticked, the student's text is printed, or the form's default when the student has none (the open
   year, the school's administration, التحكم's المديرية, the forms' own titles); unticked, an empty

@@ -182,9 +182,11 @@ export const api = {
   saveStudentGrades: (
     token: string,
     id: number,
-    grades: { subjectId: number; score: number | null; scoreMin: number | null }[]
+    grades: { subjectId: number; score: number | null; scoreMin: number | null }[],
+    // الدور, saved with the degrees when given ("" clears it).
+    round?: string
   ) =>
-    request<{ ok: true }>(`/students/${id}/grades`, { method: "PUT", body: JSON.stringify({ grades }), token }),
+    request<{ ok: true }>(`/students/${id}/grades`, { method: "PUT", body: JSON.stringify({ grades, round }), token }),
 
   getDegreesOverview: (token: string) =>
     request<{ subjects: import("./types").SubjectDegrees[]; students: import("./types").DegreesOverviewStudent[] }>(

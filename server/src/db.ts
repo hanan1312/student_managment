@@ -713,6 +713,8 @@ function migrateSubjectsColumns() {
     db.exec("ALTER TABLE student_grades ADD COLUMN score_min REAL");
     db.exec("DELETE FROM student_grades WHERE score IS NULL");
   }
+  // Degrees are kept to two decimals (see roundDegree in routes/students.ts).
+  db.exec("UPDATE student_grades SET score = ROUND(score, 2) WHERE score <> ROUND(score, 2)");
 }
 
 const USER_COLUMNS: [string, string][] = [

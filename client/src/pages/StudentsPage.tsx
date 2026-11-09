@@ -29,9 +29,10 @@ import { broadcastChange, useSyncListener } from "../lib/liveSync";
 import { genderLabel } from "../lib/studentColumns";
 import { SHOW_EXTENDED_FEATURES } from "../lib/features";
 import { useUiControl } from "../lib/uiControl";
-import { passStatus } from "../lib/degrees";
+import { passStatus, roundDegree } from "../lib/degrees";
 import { ageOn, ageReferenceDate } from "../lib/studentAge";
 import { birthdayFromNationalId } from "../lib/nationalId";
+import { normalizeRound, studentRound } from "../lib/certificateForms";
 import { sameName, toNumber } from "../lib/importValues";
 import { useSettings } from "../context/SettingsContext";
 import type { AdmissionInput, ClassStage, FeeType, PaymentInput, Student, StudentInput, Subject } from "../lib/types";
@@ -232,6 +233,7 @@ const STUDENT_IMPORT_COLUMNS: ImportColumn[] = [
   { key: "school", label: "المدرسة", aliases: ["School"] },
   { key: "religion", label: "الديانة", example: "مسلم", aliases: ["Religion"] },
   { key: "enrollmentType", label: "نوع القيد", example: "مستجد", aliases: ["Enrollment Type"] },
+  { key: "round", label: "الدور", example: "الأول" },
   { key: "nationality", label: "الجنسية", example: "مصري", aliases: ["Nationality"] },
   ...(SHOW_EXTENDED_FEATURES
     ? [
@@ -379,7 +381,8 @@ export default function StudentsPage() {
     for (const [key, value] of Object.entries(raw)) {
       if (!key.startsWith("subject:") || isNoDegree(value)) continue;
       const subject = key.slice(8);
-      const score = toNumber(value);
+      const typed = toNumber(value);
+      const score = typed === null ? null : roundDegree(typed);
       if (score === null || score < 0) return { error: `${subject}: "${value}" ليست درجة صحيحة` };
       const max = importSubjects
         .find((s) => arNorm(s.name) === arNorm(subject))
@@ -556,6 +559,7 @@ export default function StudentsPage() {
         religion: normalizeReligion(raw.religion),
         enrollmentType: normalizeEnrollmentType(raw.enrollmentType),
         nationality: raw.nationality?.trim() || undefined,
+        formFields: normalizeRound(raw.round) ? { round: normalizeRound(raw.round)! } : undefined,
       },
       warning: gender === "U" ? "النوع غير موجود في الملف — تم الاستيراد كغير محدد" : undefined,
     };
@@ -587,6 +591,7 @@ export default function StudentsPage() {
       "المدرسة",
       "الديانة",
       "نوع القيد",
+      "الدور",
       "الجنسية",
       "مجموع الدرجات",
       "النسبة المئوية",
@@ -606,6 +611,7 @@ export default function StudentsPage() {
       المدرسة: s.school ?? "",
       الديانة: s.religion ?? "",
       "نوع القيد": s.enrollment_type ?? "",
+      الدور: studentRound(s.form_fields),
       الجنسية: s.nationality ?? "",
       "مجموع الدرجات": s.total_degrees ?? "",
       "النسبة المئوية": s.percentage == null ? "" : `${s.percentage}%`,

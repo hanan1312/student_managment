@@ -1,6 +1,7 @@
 import { ageOn } from "./studentAge";
 import { formatMoeCode, genderLabel } from "./studentColumns";
 import type { DegreesOverviewStudent } from "./types";
+import { studentRound } from "./certificateForms";
 
 // The student-data columns of ملف الدرجات and its print, in table order. The `extra` ones (the
 // rest of البيانات الأساسية) stay hidden until ticked in الأعمدة. ageRef is 1 October of the
@@ -15,6 +16,7 @@ export const DEGREES_INFO_FIELDS: {
   { key: "gender", label: "النوع", extra: true, get: (s) => genderLabel(s.gender) },
   { key: "religion", label: "الديانة", extra: true, get: (s) => s.religion ?? "" },
   { key: "enrollment_type", label: "نوع القيد", extra: true, get: (s) => s.enrollment_type ?? "" },
+  { key: "exam_round", label: "الدور", extra: true, get: (s) => studentRound(s.form_fields) },
   { key: "nationality", label: "الجنسية", extra: true, get: (s) => s.nationality ?? "" },
   { key: "national_id", label: "الرقم القومي", get: (s) => s.national_id ?? "" },
   { key: "moe_code", label: "كود الحكومة الالكترونية", get: (s) => formatMoeCode(s.moe_code) },

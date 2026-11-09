@@ -20,6 +20,7 @@ import {
   formatPercentage,
   marksText,
   passStatus,
+  roundDegree,
   sharedTotalMarks,
   splitByOutside,
   statusBadgeClass,
@@ -359,7 +360,8 @@ export default function DegreesProfileModal({ onClose }: { onClose: () => void }
       if (!key.startsWith("subject:") || !value.trim() || /^[-—–]+$/.test(value.trim())) continue;
       const subjectId = Number(key.slice(8));
       const name = subjects.find((s) => s.id === subjectId)?.name ?? "";
-      const score = toNumber(value);
+      const typed = toNumber(value);
+      const score = typed === null ? null : roundDegree(typed);
       if (score === null || score < 0) return { error: `${name}: "${value}" ليست درجة صحيحة` };
       const grade = student.grades.find((g) => g.subject_id === subjectId);
       if (!grade) {

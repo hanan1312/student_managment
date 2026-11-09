@@ -381,6 +381,9 @@ function studentGrades(studentId: number, levelId: number | null): GradeRow[] {
 // مجموع الدرجات = the student's degrees; النسبة المئوية = مجموع الدرجات ÷ مجموع النهايات الكبرى × 100.
 // Subjects خارج المجموع are left out; in a choose-one group only the graded member's marks count
 // (or one member's, before any is graded). Mirrors client/src/lib/degrees.ts degreeTotals.
+// Degrees and their sums are kept to two decimals (client/src/lib/degrees.ts roundDegree).
+const roundDegree = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 function degreeSummary(grades: GradeRow[]): { total_degrees: number | null; percentage: number | null } {
   const counted = grades.filter((g) => !g.outside_total);
   const groups = new Map<string, GradeRow[]>();
@@ -391,8 +394,8 @@ function degreeSummary(grades: GradeRow[]): { total_degrees: number | null; perc
     return members.some((m) => m.score !== null) ? g.score !== null : members[0] === g;
   });
   if (!counted.some((g) => g.score !== null)) return { total_degrees: null, percentage: null };
-  const score = counted.reduce((t, g) => t + (g.score ?? 0), 0);
-  const max = marksRows.reduce((t, g) => t + (g.max_degree ?? 0), 0);
+  const score = roundDegree(counted.reduce((t, g) => t + (g.score ?? 0), 0));
+  const max = roundDegree(marksRows.reduce((t, g) => t + (g.max_degree ?? 0), 0));
   return { total_degrees: score, percentage: max > 0 ? Math.round((1000 * score) / max) / 10 : null };
 }
 
@@ -480,7 +483,8 @@ studentsRouter.put("/:id/grades", requireAuth, (req, res) => {
   for (const row of rows) {
     const subjectId = Number(row.subjectId);
     if (!Number.isInteger(subjectId)) continue;
-    const score = toNum(row.score);
+    const typed = toNum(row.score);
+    const score = typed === null ? null : roundDegree(typed);
     const scoreMin = toNum(row.scoreMin);
     const prev = existing.get(subjectId);
     // The degree is one value (score); score_min is no longer entered and is only kept if sent.
@@ -511,6 +515,18 @@ studentsRouter.put("/:id/grades", requireAuth, (req, res) => {
     for (const p of planned) {
       if (p.score === null && p.scoreMin === null) remove.run(id, p.subjectId);
       else upsert.run(id, p.subjectId, p.score, p.scoreMin, p.max, p.min);
+    }
+    // الدور (set in ملف الدرجات) is the result forms' "round" text in form_fields.
+    const round = (req.body ?? {}).round;
+    if (typeof round === "string") {
+      const row = db.prepare("SELECT form_fields FROM students WHERE id = ?").get(id) as { form_fields: string | null };
+      let fields: Record<string, unknown> = {};
+      try {
+        fields = row.form_fields ? JSON.parse(row.form_fields) : {};
+      } catch {
+        // Unreadable texts are replaced.
+      }
+      db.prepare("UPDATE students SET form_fields = ? WHERE id = ?").run(formFieldsJson({ ...fields, round }), id);
     }
   })();
   res.json({ ok: true });
