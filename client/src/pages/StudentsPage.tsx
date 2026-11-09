@@ -32,10 +32,10 @@ import { useUiControl } from "../lib/uiControl";
 import { passStatus, roundDegree } from "../lib/degrees";
 import { ageOn, ageReferenceDate } from "../lib/studentAge";
 import { birthdayFromNationalId } from "../lib/nationalId";
-import { normalizeRound, studentRound } from "../lib/certificateForms";
+import { normalizeRound, parseFormFields, studentRound } from "../lib/certificateForms";
 import { sameName, toNumber } from "../lib/importValues";
 import { useSettings } from "../context/SettingsContext";
-import type { AdmissionInput, ClassStage, FeeType, PaymentInput, Student, StudentInput, Subject } from "../lib/types";
+import type { AdmissionInput, ClassStage, FeeType, PaymentInput, Student, StudentGrade, StudentInput, Subject } from "../lib/types";
 import StudentFormModal from "../components/StudentFormModal";
 import DegreesProfileModal from "../components/DegreesProfileModal";
 import SubjectSetupModal from "../components/timetable/SubjectSetupModal";
@@ -156,7 +156,14 @@ function firstMatches<T>(items: T[], tests: ((item: T) => boolean)[]): T[] {
 // A students import can carry degrees: the columns after الصف that aren't student fields, holding
 // numbers, are subjects named by their header. They're added to (or linked in) المواد and the
 // degrees saved to the student's ملف الدرجات.
-type StudentImport = { student: StudentInput; grades: { subject: string; score: number }[] };
+type StudentImport = {
+  student: StudentInput;
+  grades: { subject: string; score: number }[];
+  // A duplicate whose empty fields are filled from the file instead of adding it: the student's
+  // id and the fields to set (grades then holds only the degrees the student doesn't have yet).
+  updateId?: number;
+  updateFields?: Partial<StudentInput>;
+};
 
 // Columns of an exported students file that hold numbers but aren't subjects.
 const NOT_SUBJECT_HEADERS = new Set(["م", "مجموع الدرجات", "المجموع", "النسبة المئوية", "النسبة", "%", "الحالة"].map(arNorm));
@@ -177,18 +184,27 @@ function subjectImportColumns(
 
 // A row is a duplicate when its الرقم القومي or كود الحكومة الالكترونية is already a student's, or
 // a student with the same name is in the same الصف; earlier rows of the same file count too.
-type DuplicateRow = { rowNumber: number; name: string; reason: string };
+// existing: the app's student the row matches (none for a row repeating an earlier one of the file).
+type DuplicateRow = { rowNumber: number; name: string; reason: string; existing?: Student };
 const idDigits = (v: string | null | undefined) =>
   (v ?? "").replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/\D/g, "");
 
 function findDuplicates(rows: MappedRow<StudentImport>[], existing: Student[]): DuplicateRow[] {
-  type Known = { name: string; nationalId: string; moeCode: string; levelId: number | null; where: string };
+  type Known = {
+    name: string;
+    nationalId: string;
+    moeCode: string;
+    levelId: number | null;
+    where: string;
+    student?: Student;
+  };
   const known: Known[] = existing.map((st) => ({
     name: st.name,
     nationalId: idDigits(st.national_id),
     moeCode: idDigits(st.moe_code),
     levelId: st.level_id,
     where: `موجود: ${st.name}`,
+    student: st,
   }));
   const out: DuplicateRow[] = [];
   for (const r of rows) {
@@ -214,11 +230,64 @@ function findDuplicates(rows: MappedRow<StudentImport>[], existing: Student[]): 
           : row.moeCode && match.moeCode === row.moeCode
           ? "نفس كود الحكومة الالكترونية"
           : "نفس الاسم والصف";
-      out.push({ rowNumber: r.rowNumber, name: st.name, reason: `${by} · ${match.where}` });
+      out.push({ rowNumber: r.rowNumber, name: st.name, reason: `${by} · ${match.where}`, existing: match.student });
     }
     known.push(row);
   }
   return out;
+}
+
+// Text fields an import can fill on a student who has them empty: [input key, student key, column].
+const FILLABLE_FIELDS: [keyof StudentInput, keyof Student, string][] = [
+  ["nationalId", "national_id", "الرقم القومي"],
+  ["moeCode", "moe_code", "كود الحكومة الالكترونية"],
+  ["birthday", "birthday", "تاريخ الميلاد"],
+  ["school", "school", "المدرسة"],
+  ["religion", "religion", "الديانة"],
+  ["enrollmentType", "enrollment_type", "نوع القيد"],
+  ["nationality", "nationality", "الجنسية"],
+  ["tel1", "tel1", "Tel-1"],
+  ["tel2", "tel2", "Tel-2"],
+  ["address", "address", "Address"],
+  ["category", "category", "Category"],
+];
+
+const isBlank = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
+
+// What a duplicate row would add to the app's student: the fields the file has and the student
+// doesn't (only empty ones; nothing already there is changed), and the degrees of subjects the
+// student has no degree in. labels names them (columns, then subjects).
+function emptyFieldUpdates(row: StudentImport, st: Student, grades: StudentGrade[]) {
+  const input = row.student;
+  const fields: Partial<StudentInput> = {};
+  const labels: string[] = [];
+  if (st.gender === "U" && input.gender !== "U") {
+    fields.gender = input.gender;
+    labels.push("النوع");
+  }
+  if (st.level_id == null && input.levelId) {
+    Object.assign(fields, { levelId: input.levelId, division: input.division, section: input.section });
+    labels.push("المرحلة / الصف");
+  } else if (isBlank(st.division) && !isBlank(input.division) && !input.levelId) {
+    fields.division = input.division;
+    labels.push("المرحلة");
+  }
+  for (const [inKey, stKey, label] of FILLABLE_FIELDS) {
+    if (isBlank(st[stKey]) && !isBlank(input[inKey])) {
+      Object.assign(fields, { [inKey]: input[inKey] });
+      labels.push(label);
+    }
+  }
+  const round = input.formFields?.round;
+  if (round && !studentRound(st.form_fields)) {
+    // The form's texts are sent whole: the student's others are kept.
+    fields.formFields = { ...parseFormFields(st.form_fields), round } as Record<string, string>;
+    labels.push("الدور");
+  }
+  const graded = new Set(grades.filter((g) => g.score !== null).map((g) => arNorm(g.subject_name)));
+  const newGrades = row.grades.filter((g) => !graded.has(arNorm(g.subject)));
+  labels.push(...newGrades.map((g) => g.subject));
+  return { fields, grades: newGrades, labels };
 }
 
 const STUDENT_IMPORT_COLUMNS: ImportColumn[] = [
@@ -429,11 +498,16 @@ export default function StudentsPage() {
     }
   };
 
-  // Duplicates are listed before anything is saved: add them anyway, skip them, or go back.
+  // Duplicates are listed before anything is saved. One whose student in the app has empty fields
+  // the file fills (or no degree in a subject the file has) shows them and can be updated
+  // instead; the rest are skipped, or everything is added anyway, or back to the preview.
+  type DuplicateChoice = { kind: "update"; rowNumbers: Set<number> } | { kind: "skip" } | { kind: "all" } | null;
+  type DuplicateUpdate = ReturnType<typeof emptyFieldUpdates>;
   const [duplicateAsk, setDuplicateAsk] = useState<{
-    rows: DuplicateRow[];
-    resolve: (choice: "all" | "skip" | null) => void;
+    rows: (DuplicateRow & { update?: DuplicateUpdate })[];
+    resolve: (choice: DuplicateChoice) => void;
   } | null>(null);
+  const [updatePicked, setUpdatePicked] = useState<Set<number>>(new Set());
 
   const beforeStudentImport = async (rows: MappedRow<StudentImport>[]): Promise<MappedRow<StudentImport>[] | null> => {
     if (!token) return null;
@@ -447,19 +521,63 @@ export default function StudentsPage() {
     }
     let result = rows;
     if (duplicates.length > 0) {
-      const choice = await new Promise<"all" | "skip" | null>((resolve) => setDuplicateAsk({ rows: duplicates, resolve }));
+      let withUpdates: (DuplicateRow & { update?: DuplicateUpdate })[];
+      try {
+        withUpdates = await Promise.all(
+          duplicates.map(async (d) => {
+            const row = rows.find((r) => r.rowNumber === d.rowNumber)!.input!;
+            if (!d.existing) return d;
+            const grades = row.grades.length > 0 ? (await api.getStudentGrades(token, d.existing.id)).grades : [];
+            const update = emptyFieldUpdates(row, d.existing, grades);
+            return update.labels.length > 0 ? { ...d, update } : d;
+          })
+        );
+      } catch (err) {
+        setErrorMsg(err instanceof ApiError ? err.message : "تعذر قراءة بيانات الطلاب المكررين.");
+        return null;
+      }
+      setUpdatePicked(new Set(withUpdates.filter((d) => d.update).map((d) => d.rowNumber)));
+      const choice = await new Promise<DuplicateChoice>((resolve) => setDuplicateAsk({ rows: withUpdates, resolve }));
       setDuplicateAsk(null);
       if (!choice) return null;
-      if (choice === "skip") {
-        const skipped = new Set(duplicates.map((d) => d.rowNumber));
-        result = rows.map((r) => (skipped.has(r.rowNumber) ? { ...r, error: "مكرر — تم التخطي" } : r));
+      if (choice.kind !== "all") {
+        const byRow = new Map(withUpdates.map((d) => [d.rowNumber, d]));
+        result = rows.map((r) => {
+          const d = byRow.get(r.rowNumber);
+          if (!d || !r.input) return r;
+          if (choice.kind === "update" && d.update && d.existing && choice.rowNumbers.has(d.rowNumber)) {
+            const levelId = d.update.fields.levelId ?? d.existing.level_id ?? undefined;
+            return {
+              ...r,
+              input: {
+                student: { ...r.input.student, levelId },
+                grades: d.update.grades,
+                updateId: d.existing.id,
+                updateFields: d.update.fields,
+              },
+              warning: `تحديث ${d.existing.name}: ${d.update.labels.join("، ")}`,
+            };
+          }
+          return { ...r, error: "مكرر — تم التخطي" };
+        });
       }
     }
     return syncImportSubjects(result);
   };
 
-  const importStudentRow = async ({ student, grades }: StudentImport) => {
+  const importStudentRow = async ({ student, grades, updateId, updateFields }: StudentImport) => {
     if (!token) return;
+    if (updateId !== undefined) {
+      if (updateFields && Object.keys(updateFields).length > 0) await api.updateStudent(token, updateId, updateFields);
+      if (grades.length > 0) {
+        await api.saveStudentGrades(
+          token,
+          updateId,
+          grades.map((g) => ({ subjectId: importSubjectIds.current.get(arNorm(g.subject))!, score: g.score, scoreMin: null }))
+        );
+      }
+      return;
+    }
     const { student: created } = await api.createStudent(token, student);
     if (grades.length === 0) return;
     try {
@@ -847,18 +965,47 @@ export default function StudentsPage() {
           <div className="animate-rise-in flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
             <div className="border-b border-slate-100 px-5 py-4">
               <h2 className="text-base font-semibold text-slate-800">طلاب مكررون ({duplicateAsk.rows.length})</h2>
-              <p className="text-xs text-slate-500">هذه الصفوف موجودة بالفعل أو مكررة في الملف. هل تريد إضافتها؟</p>
+              <p className="text-xs text-slate-500">
+                هذه الصفوف موجودة بالفعل أو مكررة في الملف.
+                {duplicateAsk.rows.some((d) => d.update) &&
+                  " بعضها في الملف بيانات فارغة عند الطالب في البرنامج: علّم ما تريد تحديثه (تُملأ الخانات الفارغة فقط)."}
+              </p>
             </div>
             <ul className="flex-1 divide-y divide-slate-50 overflow-y-auto px-5 py-2 text-xs">
               {duplicateAsk.rows.map((d) => (
                 <li key={d.rowNumber} className="py-1.5">
-                  <span className="text-slate-400">الصف {d.rowNumber}: </span>
-                  <span className="font-medium text-slate-700">{d.name}</span>
-                  <span className="text-amber-700"> — {d.reason}</span>
+                  <label className={`flex items-start gap-2 ${d.update ? "cursor-pointer" : ""}`}>
+                    {d.update ? (
+                      <input
+                        type="checkbox"
+                        checked={updatePicked.has(d.rowNumber)}
+                        onChange={() =>
+                          setUpdatePicked((prev) => {
+                            const next = new Set(prev);
+                            next.has(d.rowNumber) ? next.delete(d.rowNumber) : next.add(d.rowNumber);
+                            return next;
+                          })
+                        }
+                        className="mt-0.5 h-3.5 w-3.5 accent-brand-600"
+                      />
+                    ) : (
+                      <span className="w-3.5 shrink-0" />
+                    )}
+                    <span>
+                      <span className="text-slate-400">الصف {d.rowNumber}: </span>
+                      <span className="font-medium text-slate-700">{d.name}</span>
+                      <span className="text-amber-700"> — {d.reason}</span>
+                      {d.update && (
+                        <span className="mt-0.5 block text-emerald-700">
+                          تحديثات في: {d.update.labels.join("، ")}
+                        </span>
+                      )}
+                    </span>
+                  </label>
                 </li>
               ))}
             </ul>
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
               <button
                 onClick={() => duplicateAsk.resolve(null)}
                 className="rounded-lg border border-slate-200 px-3.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
@@ -866,17 +1013,30 @@ export default function StudentsPage() {
                 رجوع
               </button>
               <button
-                onClick={() => duplicateAsk.resolve("all")}
+                onClick={() => duplicateAsk.resolve({ kind: "all" })}
                 className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
               >
                 إضافتهم أيضًا
               </button>
               <button
-                onClick={() => duplicateAsk.resolve("skip")}
-                className="rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-brand-600/25"
+                onClick={() => duplicateAsk.resolve({ kind: "skip" })}
+                className={
+                  duplicateAsk.rows.some((d) => d.update)
+                    ? "rounded-lg border border-slate-200 px-3.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                    : "rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-brand-600/25"
+                }
               >
                 تخطي المكرر
               </button>
+              {duplicateAsk.rows.some((d) => d.update) && (
+                <button
+                  onClick={() => duplicateAsk.resolve({ kind: "update", rowNumbers: updatePicked })}
+                  disabled={updatePicked.size === 0}
+                  className="rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-brand-600/25 disabled:opacity-40"
+                >
+                  تحديث المحدد ({updatePicked.size}) وتخطي الباقي
+                </button>
+              )}
             </div>
           </div>
         </div>

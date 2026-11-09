@@ -143,6 +143,12 @@ Opened from **إضافة مدرسة** on the Students ribbon. It lists the schoo
   earlier row of the file, are listed with the reason. Choose **تخطي المكرر** (they're skipped and
   marked "مكرر — تم التخطي" in the preview), **إضافتهم أيضًا** (added anyway) or **رجوع** (back to
   the preview, nothing saved).
+  - **Updates:** a row matching a student in the app whose file has values the student's record has
+    empty (e.g. الديانة, الجنسية, الدور, المرحلة / الصف when not placed, النوع when غير محدد) or
+    degrees in subjects the student has no degree in shows "تحديثات في: <the columns and subjects>"
+    with a checkbox (ticked). **تحديث المحدد وتخطي الباقي** fills those for the ticked rows (only
+    empty fields; nothing already in the record changes, and no new student is added) and skips
+    the other duplicates. The preview marks them "تحديث <name>: …".
 - **Degrees in the students file:** columns after الصف that aren't student fields and hold numbers
   are read as subjects, one per column, named by the header (e.g. اللغة العربية، الرياضيات). They
   show in the preview. On import:
