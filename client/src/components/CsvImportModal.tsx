@@ -28,6 +28,10 @@ type Props<T> = {
   // "these divisions aren't in the org tree yet, create them?"). Return the (optionally amended)
   // rows to proceed, or null to cancel and stay on the preview screen.
   onBeforeImport?: (rows: MappedRow<T>[]) => Promise<MappedRow<T>[] | null>;
+  // Columns that depend on the file (e.g. one per subject): given its headers in order, and the
+  // fixed column each header maps to (if any), returns more columns to read. They show in the
+  // preview after the fixed ones.
+  fileColumns?: (headers: string[], keyOf: (header: string) => string | undefined, rows: Record<string, string>[]) => ImportColumn[];
   onImportRow: (input: T) => Promise<void>;
   onClose: () => void;
   onFinished: () => void;
@@ -44,6 +48,7 @@ export default function CsvImportModal<T>({
   columns,
   mapRow,
   onBeforeImport,
+  fileColumns,
   onImportRow,
   onClose,
   onFinished,
@@ -55,13 +60,13 @@ export default function CsvImportModal<T>({
   const [importErrors, setImportErrors] = useState<{ rowNumber: number; message: string }[]>([]);
   const [importedCount, setImportedCount] = useState(0);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [extraColumns, setExtraColumns] = useState<ImportColumn[]>([]);
 
   const baseTemplateName = templateFilename.replace(/\.csv$/i, "");
   // Preview columns can be dragged into another order (the template keeps its own).
   const previewOrder = useColumnOrder(`import:${baseTemplateName}`, columns.map((c) => c.key));
   // The preview shows the columns the file fills (all of them before a file is read).
-  const previewColumns = previewOrder.order
-    .map((key) => columns.find((c) => c.key === key)!)
+  const previewColumns = [...previewOrder.order.map((key) => columns.find((c) => c.key === key)!), ...extraColumns]
     .filter((c) => rows.length === 0 || rows.some((r) => r.raw[c.key]?.trim()));
   const templateColumns = columns.filter((c) => !c.hidden);
 
@@ -96,6 +101,11 @@ export default function CsvImportModal<T>({
           headerLookup.set(normalizeHeader(alias), col.key);
         }
       }
+
+      const headers = [...new Set(rawRows.flatMap((r) => Object.keys(r)))];
+      const extras = fileColumns?.(headers, (h) => headerLookup.get(normalizeHeader(h)), rawRows) ?? [];
+      for (const col of extras) headerLookup.set(normalizeHeader(col.label), col.key);
+      setExtraColumns(extras);
 
       const mapped: MappedRow<T>[] = rawRows.map((raw, idx) => {
         const remapped: Record<string, string> = {};
@@ -254,7 +264,7 @@ export default function CsvImportModal<T>({
                     <tr>
                       <th className="px-2.5 py-2">الصف</th>
                       {previewColumns.map((c) => (
-                        <th key={c.key} {...previewOrder.headerProps(c.key)} className="px-2.5 py-2">
+                        <th key={c.key} {...(extraColumns.includes(c) ? {} : previewOrder.headerProps(c.key))} className="px-2.5 py-2">
                           {c.label}
                         </th>
                       ))}

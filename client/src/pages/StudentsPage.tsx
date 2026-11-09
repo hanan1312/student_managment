@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import {
   UserPlus,
@@ -32,8 +32,9 @@ import { useUiControl } from "../lib/uiControl";
 import { passStatus } from "../lib/degrees";
 import { ageOn, ageReferenceDate } from "../lib/studentAge";
 import { birthdayFromNationalId } from "../lib/nationalId";
+import { toNumber } from "../lib/importValues";
 import { useSettings } from "../context/SettingsContext";
-import type { AdmissionInput, ClassStage, FeeType, PaymentInput, Student, StudentInput } from "../lib/types";
+import type { AdmissionInput, ClassStage, FeeType, PaymentInput, Student, StudentInput, Subject } from "../lib/types";
 import StudentFormModal from "../components/StudentFormModal";
 import DegreesProfileModal from "../components/DegreesProfileModal";
 import SubjectSetupModal from "../components/timetable/SubjectSetupModal";
@@ -48,7 +49,7 @@ import AttendanceAnalysisModal from "../components/AttendanceAnalysisModal";
 import NoShowModal from "../components/NoShowModal";
 import PaymentFormModal from "../components/PaymentFormModal";
 import StudentCertificateModal, { type CertificateStudent } from "../components/StudentCertificateModal";
-import CsvImportModal, { type ImportColumn } from "../components/CsvImportModal";
+import CsvImportModal, { type ImportColumn, type MappedRow } from "../components/CsvImportModal";
 import RibbonGroup from "../components/RibbonGroup";
 import SchoolFormModal from "../components/SchoolFormModal";
 
@@ -149,6 +150,28 @@ function firstMatches<T>(items: T[], tests: ((item: T) => boolean)[]): T[] {
     if (found.length > 0) return found;
   }
   return [];
+}
+
+// A students import can carry degrees: the columns after الصف that aren't student fields, holding
+// numbers, are subjects named by their header. They're added to (or linked in) المواد and the
+// degrees saved to the student's ملف الدرجات.
+type StudentImport = { student: StudentInput; grades: { subject: string; score: number }[] };
+
+// Columns of an exported students file that hold numbers but aren't subjects.
+const NOT_SUBJECT_HEADERS = new Set(["م", "مجموع الدرجات", "المجموع", "النسبة المئوية", "النسبة", "%", "الحالة"].map(arNorm));
+// An empty degree cell: blank, a dash, or غ / غائب (absent).
+const isNoDegree = (v: string | undefined) => /^([-—–]*|غ|غائب)$/.test((v ?? "").trim());
+
+function subjectImportColumns(
+  headers: string[],
+  keyOf: (header: string) => string | undefined,
+  rows: Record<string, string>[]
+): ImportColumn[] {
+  const sectionAt = headers.findIndex((h) => keyOf(h) === "section");
+  return headers
+    .filter((h, i) => i > sectionAt && !keyOf(h) && !h.startsWith("__EMPTY") && !NOT_SUBJECT_HEADERS.has(arNorm(h)))
+    .filter((h) => rows.some((r) => toNumber(r[h]) !== null) && rows.every((r) => isNoDegree(r[h]) || toNumber(r[h]) !== null))
+    .map((h) => ({ key: `subject:${h}`, label: h }));
 }
 
 const STUDENT_IMPORT_COLUMNS: ImportColumn[] = [
@@ -291,7 +314,88 @@ export default function StudentsPage() {
     setPaymentOpen(false);
   };
 
-  const mapStudentImportRow = (raw: Record<string, string>): { input?: StudentInput; error?: string; warning?: string } => {
+  // Subjects as they are in المواد while the import is open, and the ids its subject columns get
+  // once they're added or linked (just before the rows are saved).
+  const [importSubjects, setImportSubjects] = useState<Subject[]>([]);
+  const importSubjectIds = useRef(new Map<string, number>());
+  useEffect(() => {
+    if (!importOpen || !token) return;
+    api
+      .getSubjects(token)
+      .then((r) => setImportSubjects(r.subjects))
+      .catch(() => setImportSubjects([]));
+  }, [importOpen, token]);
+
+  const mapStudentImportRow = (raw: Record<string, string>): { input?: StudentImport; error?: string; warning?: string } => {
+    const { input, error, warning } = mapStudentFields(raw);
+    if (!input) return { error, warning };
+    const grades: StudentImport["grades"] = [];
+    for (const [key, value] of Object.entries(raw)) {
+      if (!key.startsWith("subject:") || isNoDegree(value)) continue;
+      const subject = key.slice(8);
+      const score = toNumber(value);
+      if (score === null || score < 0) return { error: `${subject}: "${value}" ليست درجة صحيحة` };
+      const max = importSubjects
+        .find((s) => arNorm(s.name) === arNorm(subject))
+        ?.level_marks.find((m) => m.level_id === input.levelId)?.max_degree;
+      if (max != null && score > max) return { error: `${subject}: ${score} أكبر من النهاية الكبرى (${max})` };
+      grades.push({ subject, score });
+    }
+    return { input: { student: input, grades }, warning };
+  };
+
+  // Each subject column becomes a subject in المواد (when none has its name), linked to the sections
+  // of the students who have a degree in it; an existing subject keeps its other sections and marks.
+  const syncImportSubjects = async (rows: MappedRow<StudentImport>[]): Promise<MappedRow<StudentImport>[] | null> => {
+    if (!token) return null;
+    const used = new Map<string, { name: string; levelIds: Set<number> }>();
+    for (const r of rows) {
+      if (!r.input || r.error) continue;
+      for (const g of r.input.grades) {
+        const entry = used.get(arNorm(g.subject)) ?? { name: g.subject, levelIds: new Set<number>() };
+        if (r.input.student.levelId) entry.levelIds.add(r.input.student.levelId);
+        used.set(arNorm(g.subject), entry);
+      }
+    }
+    if (used.size === 0) return rows;
+    try {
+      const { subjects } = await api.getSubjects(token);
+      const ids = new Map<string, number>();
+      for (const [key, { name, levelIds }] of used) {
+        const existing = subjects.find((s) => arNorm(s.name) === key);
+        if (!existing) {
+          const { subject } = await api.createSubject(token, { name, levelIds: [...levelIds] });
+          ids.set(key, subject.id);
+          continue;
+        }
+        const missing = [...levelIds].filter((id) => !existing.level_ids.includes(id));
+        if (missing.length > 0) await api.updateSubject(token, existing.id, { levelIds: [...existing.level_ids, ...missing] });
+        ids.set(key, existing.id);
+      }
+      importSubjectIds.current = ids;
+      return rows;
+    } catch (err) {
+      setErrorMsg(err instanceof ApiError ? err.message : "تعذر تحديث المواد.");
+      return null;
+    }
+  };
+
+  const importStudentRow = async ({ student, grades }: StudentImport) => {
+    if (!token) return;
+    const { student: created } = await api.createStudent(token, student);
+    if (grades.length === 0) return;
+    try {
+      await api.saveStudentGrades(
+        token,
+        created.id,
+        grades.map((g) => ({ subjectId: importSubjectIds.current.get(arNorm(g.subject))!, score: g.score, scoreMin: null }))
+      );
+    } catch (err) {
+      throw new Error(`تمت إضافة الطالب لكن لم تُحفظ درجاته: ${err instanceof Error ? err.message : ""}`);
+    }
+  };
+
+  const mapStudentFields = (raw: Record<string, string>): { input?: StudentInput; error?: string; warning?: string } => {
     const genderRaw = raw.gender?.trim().toUpperCase();
     const gender: "M" | "F" | "U" =
       genderRaw === "M" || genderRaw === "MALE" || genderRaw === "ذكر"
@@ -640,12 +744,15 @@ export default function StudentsPage() {
       )}
 
       {importOpen && token && (
-        <CsvImportModal<StudentInput>
+        <CsvImportModal<StudentImport>
           title="استيراد الطلاب"
+          description="بعد عمود الصف يمكن إضافة عمود لكل مادة باسمها فيه درجات الطلاب: تُضاف المادة إلى المواد وتُحفظ الدرجات في ملف الدرجات."
           templateFilename="students-template.csv"
           columns={STUDENT_IMPORT_COLUMNS}
+          fileColumns={subjectImportColumns}
           mapRow={mapStudentImportRow}
-          onImportRow={(input) => api.createStudent(token, input).then(() => {})}
+          onBeforeImport={syncImportSubjects}
+          onImportRow={importStudentRow}
           onClose={() => setImportOpen(false)}
           onFinished={() => {
             loadStudents();

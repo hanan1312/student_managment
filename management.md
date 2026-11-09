@@ -126,8 +126,21 @@ Opened from **إضافة مدرسة** on the Students ribbon. It lists the schoo
   are treated alike, and the words "المرحلة" and "الصف" can be left out. "الاعدادية" is saved as
   "المرحلة الإعدادية", and "الاول" (with that المرحلة) as "الصف الأول الإعدادي". An exact match always
   wins; a value that fits more than one الصف is an error asking for the full path or the المرحلة.
-  A section that isn't in the Hierarchy is left empty and the row still imports
-  (الحالة stays empty for it).
+  A section that isn't in the Hierarchy is left empty and the row still imports (الحالة stays
+  empty for it).
+- **Degrees in the students file:** columns after الصف that aren't student fields and hold numbers
+  are read as subjects, one per column, named by the header (e.g. اللغة العربية، الرياضيات). They
+  show in the preview. On import:
+  - A subject whose name isn't in **المواد** is added there (spelling variants as above count as the
+    same name), linked to the sections of the imported students who have a degree in it. An existing
+    subject is linked to any of those sections it's missing; its other sections and marks stay.
+  - Each student's degrees are saved to their **ملف الدرجات**, so مجموع الدرجات, النسبة المئوية,
+    الحالة, the Degrees Profile and certificates show them.
+  - Empty cells, "—", غ and غائب mean no degree. A degree above the section's النهاية الكبرى rejects
+    the row.
+  - A new subject has no النهايات yet: set them in المواد for the percentage and الحالة to show.
+  - Columns of an exported file that aren't subjects (م، مجموع الدرجات، النسبة المئوية، الحالة) and
+    columns holding text are ignored.
 
 ### Print (طباعة)
 
