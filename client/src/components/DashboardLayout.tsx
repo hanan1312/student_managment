@@ -19,7 +19,7 @@ import Copyright from "./Copyright";
 export type LayoutContext = {
   notify: (label: string) => void;
   goToSection: (key: SectionKey) => void;
-  sections: { key: SectionKey; label: string; tabs: AppTab[] }[];
+  sections: { key: SectionKey; label: string }[];
 };
 
 function sectionForPath(tabs: AppTab[], pathname: string): SectionKey {
@@ -110,17 +110,12 @@ export default function DashboardLayout() {
     if (target) navigate(target.path);
   };
 
-  // The home page ("/") shows the sections as cards: no section is active and there's no tab row
-  // or tree beside it.
+  // The home page ("/") shows the sections as cards: no section or tab rows and no tree beside it.
   const isHome = pathname === "/";
   const layoutContext: LayoutContext = {
     notify: (label: string) => notify(label),
     goToSection,
-    sections: visibleSections.map((s) => ({
-      key: s.key,
-      label: ui.sectionLabel(s.key),
-      tabs: navTabs.filter((m) => m.section === s.key),
-    })),
+    sections: visibleSections.map((s) => ({ key: s.key, label: ui.sectionLabel(s.key) })),
   };
 
   const schoolName = settings.school_name || "SchoolSuite";
@@ -216,13 +211,14 @@ export default function DashboardLayout() {
         </div>
       </header>
 
+      {!isHome && (
       <div className="relative z-10 flex items-center gap-1 border-b border-slate-200 bg-slate-100/80 px-3 pt-1.5 backdrop-blur-sm">
         {visibleSections.map((s) => (
           <button
             key={s.key}
             onClick={() => goToSection(s.key)}
             className={`relative shrink-0 rounded-t-lg px-4 py-1.5 text-sm font-medium transition ${
-              !isHome && activeSection === s.key
+              activeSection === s.key
                 ? "bg-white text-brand-700 shadow-[0_-1px_0_rgba(15,23,42,0.04)]"
                 : "text-slate-500 hover:bg-white/60 hover:text-slate-700"
             }`}
@@ -231,6 +227,7 @@ export default function DashboardLayout() {
           </button>
         ))}
       </div>
+      )}
 
       {!isHome && (
       <nav className="relative z-10 flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-white/95 px-3 py-1.5 shadow-sm backdrop-blur-sm">

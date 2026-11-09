@@ -15,8 +15,8 @@ and code are kept and can be switched back on with one setting (`SHOW_EXTENDED_F
 
 **Home page:** after signing in the app opens on a home page: a banner with the school's logo and
 name and the welcome text, revealed word by word (the إدارة and مدينة in gold), then the user's
-name, today's date and العام الدراسي; under it a card per section (**شئون الطلاب**, listing its
-tabs) that opens the section. The text is set in
+name, today's date and العام الدراسي; under it a card per section (**شئون الطلاب**) that opens the section. The home
+page has no section or tab bars. The text is set in
 **التحكم → الصفحة الرئيسية → نص الترحيب** (default "أهلًا وسهلًا بكم في إدارة {الإدارة} بمدينة
 {المدينة}"): {الإدارة} and {المدينة} are replaced by the signed-in user's إدارة تعليمية and مدينة from
 **المستخدمين** (a leading "إدارة" in the name isn't repeated). An account without them (e.g. admin)

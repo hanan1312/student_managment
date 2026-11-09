@@ -142,15 +142,6 @@ export default function HomePage() {
                   <ArrowLeft size={18} className="transition-transform duration-300 group-hover:-translate-x-0.5" />
                 </span>
               </div>
-              {s.tabs.length > 0 && (
-                <div className="relative mt-5 flex flex-wrap gap-1.5 border-t border-slate-100 pt-4">
-                  {s.tabs.map((t) => (
-                    <span key={t.key} className="rounded-full bg-slate-50 px-2.5 py-1 text-xs text-slate-500 ring-1 ring-slate-200/70">
-                      {t.label}
-                    </span>
-                  ))}
-                </div>
-              )}
             </button>
           );
         })}
