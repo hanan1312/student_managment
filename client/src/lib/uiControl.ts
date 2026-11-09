@@ -86,11 +86,29 @@ export type TextKey = keyof typeof TEXTS;
 
 // The welcome text with {الإدارة} and {المدينة} filled in. The name of the إدارة is used without
 // a leading "إدارة", since the text says it (e.g. "إدارة جنوب" → "في إدارة جنوب").
-export function welcomeText(template: string, place: { admin: string; city: string }): string {
+// welcomeSegments keeps the filled-in parts apart (highlight), for the home page to show them
+// in gold.
+export function welcomeSegments(
+  template: string,
+  place: { admin: string; city: string }
+): { text: string; highlight: boolean }[] {
   const admin = place.admin.trim().replace(/^[اإأ]دار[ةه]\s+/, "");
   return template
-    .replace(/\{\s*ال[اإأ]دار[ةه]\s*\}/g, admin)
-    .replace(/\{\s*المدين[ةه]\s*\}/g, place.city.trim())
+    .split(/(\{\s*(?:ال[اإأ]دار[ةه]|المدين[ةه])\s*\})/)
+    .map((part) =>
+      /^\{\s*ال[اإأ]دار[ةه]\s*\}$/.test(part)
+        ? { text: admin, highlight: true }
+        : /^\{\s*المدين[ةه]\s*\}$/.test(part)
+          ? { text: place.city.trim(), highlight: true }
+          : { text: part, highlight: false }
+    )
+    .filter((s) => s.text);
+}
+
+export function welcomeText(template: string, place: { admin: string; city: string }): string {
+  return welcomeSegments(template, place)
+    .map((s) => s.text)
+    .join("")
     .replace(/\s{2,}/g, " ")
     .trim();
 }

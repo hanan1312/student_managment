@@ -13,8 +13,10 @@ Inventory, HR & Staff, and the extra student tabs and fields) is **hidden, not d
 and code are kept and can be switched back on with one setting (`SHOW_EXTENDED_FEATURES` in
 `client/src/lib/features.ts`).
 
-**Home page:** after signing in the app opens on a home page: a card per section (**شئون الطلاب**,
-listing its tabs) that opens the section, and under it a welcome text. The text is set in
+**Home page:** after signing in the app opens on a home page: a banner with the school's logo and
+name and the welcome text, revealed word by word (the إدارة and مدينة in gold), then the user's
+name, today's date and العام الدراسي; under it a card per section (**شئون الطلاب**, listing its
+tabs) that opens the section. The text is set in
 **التحكم → الصفحة الرئيسية → نص الترحيب** (default "أهلًا وسهلًا بكم في إدارة {الإدارة} بمدينة
 {المدينة}"): {الإدارة} and {المدينة} are replaced by the signed-in user's إدارة تعليمية and مدينة from
 **المستخدمين** (a leading "إدارة" in the name isn't repeated). An account without them (e.g. admin)

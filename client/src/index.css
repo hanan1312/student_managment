@@ -186,6 +186,51 @@ body {
   animation: underline-in 0.25s ease-out both;
 }
 
+/* The home page's welcome text: each word rises out of a blur, one after another (the delay is
+   set per word). */
+@keyframes word-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-word-in {
+  display: inline-block;
+  animation: word-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes line-grow {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.animate-line-grow {
+  animation: line-grow 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-word-in,
+  .animate-line-grow,
+  .animate-shimmer,
+  .animate-float-slow,
+  .animate-float-slower {
+    animation: none;
+  }
+}
+
 ::selection {
   background: var(--color-brand-100);
   color: var(--color-brand-700);
