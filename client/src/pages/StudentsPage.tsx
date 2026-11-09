@@ -112,6 +112,45 @@ function normalizeEnrollmentType(raw: string | undefined): string | undefined {
   return v;
 }
 
+// Import matching of المرحلة / الصف: spelling variants (ا / أ / إ, ى / ي, ة / ه, diacritics) are
+// ignored, and so are the words "المرحلة" and "الصف", so "الاعدادية" finds "المرحلة الإعدادية" and
+// "الاول" finds "الصف الأول الإعدادي".
+function arNorm(v: string): string {
+  return v
+    .trim()
+    .toLowerCase()
+    .replace(/[ً-ْـ()"']/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s*\/\s*/g, " / ")
+    .replace(/\s+/g, " ");
+}
+
+const IMPORT_FILLER_WORDS = new Set(["المرحله", "مرحله", "الصف", "صف"]);
+
+function arWords(v: string): string[] {
+  return arNorm(v)
+    .split(/[\s/]+/)
+    .filter((w) => w && !IMPORT_FILLER_WORDS.has(w));
+}
+
+// Every word of the typed value is in the candidate's name.
+function wordsWithin(typed: string, name: string): boolean {
+  const words = arWords(typed);
+  const nameWords = new Set(arWords(name));
+  return words.length > 0 && words.every((w) => nameWords.has(w));
+}
+
+// Tries each test in turn and returns the first one's matches, so an exact match wins over a looser one.
+function firstMatches<T>(items: T[], tests: ((item: T) => boolean)[]): T[] {
+  for (const test of tests) {
+    const found = items.filter(test);
+    if (found.length > 0) return found;
+  }
+  return [];
+}
+
 const STUDENT_IMPORT_COLUMNS: ImportColumn[] = [
   // Arabic headers; the old English ones stay as aliases so earlier files still import.
   { key: "name", label: "الاسم", required: true, example: "Ahmed Mostafa Hassan", aliases: ["Name"] },
@@ -265,17 +304,37 @@ export default function StudentsPage() {
     let levelId: number | undefined;
     let division: string | undefined = raw.division?.trim() || undefined;
     let section: string | undefined = raw.section?.trim() || undefined;
+    // Division is matched to a stage of the Hierarchy ("الاعدادية" → "المرحلة الإعدادية") and saved
+    // under the stage's own name; one that matches no stage (or several) is kept as typed.
+    let stageName: string | undefined;
+    if (division) {
+      const typed = division;
+      const stages = firstMatches(tree, [
+        (st) => arNorm(st.stage) === arNorm(typed),
+        (st) => arWords(st.stage).join(" ") === arWords(typed).join(" "),
+        (st) => wordsWithin(typed, st.stage),
+      ]);
+      if (stages.length === 1) {
+        stageName = stages[0].stage;
+        division = stageName;
+      }
+    }
     // Position: the Section names a leaf level, by its full path ("الصف الثاني الثانوي / البكالوريا
-    // المصرية / الأعمال") or by its own name when that's unique; Division narrows it when given.
+    // المصرية / الأعمال"), by its own name when that's unique, or by part of it ("الاول" →
+    // "الصف الأول الإعدادي"); the matched Division narrows it.
     if (section) {
-      const norm = (v: string) => v.trim().replace(/\s*\/\s*/g, " / ").toLowerCase();
+      const typed = section;
       const leaves = tree.flatMap((st) =>
         st.levels
-          .filter((l) => l.is_leaf && (!division || norm(st.stage) === norm(division)))
+          .filter((l) => l.is_leaf && (!stageName || st.stage === stageName))
           .map((l) => ({ id: l.id, stage: st.stage, path: l.path, name: l.level }))
       );
-      const byPath = leaves.filter((l) => norm(l.path) === norm(section!));
-      const candidates = byPath.length > 0 ? byPath : leaves.filter((l) => norm(l.name) === norm(section!));
+      const candidates = firstMatches(leaves, [
+        (l) => arNorm(l.path) === arNorm(typed),
+        (l) => arNorm(l.name) === arNorm(typed),
+        (l) => wordsWithin(typed, l.name),
+        (l) => wordsWithin(typed, l.path),
+      ]);
       if (candidates.length > 1) {
         return { error: `الصف "${section}" موجود في أكثر من مكان — اكتب المسار كاملاً أو أضف المرحلة` };
       }

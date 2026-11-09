@@ -121,7 +121,12 @@ Opened from **إضافة مدرسة** on the Students ribbon. It lists the schoo
 - Older files with English headers still import.
 - Gender and religion accept Arabic or English values (e.g. ذكر/M, مسلم/Muslim).
 - The section column can hold either the full Hierarchy path or just the section name, if that
-  name is unique. A section that isn't in the Hierarchy is left empty and the row still imports
+  name is unique.
+- المرحلة and الصف don't have to be written exactly as in the Hierarchy: ا / أ / إ, ى / ي and ة / ه
+  are treated alike, and the words "المرحلة" and "الصف" can be left out. "الاعدادية" is saved as
+  "المرحلة الإعدادية", and "الاول" (with that المرحلة) as "الصف الأول الإعدادي". An exact match always
+  wins; a value that fits more than one الصف is an error asking for the full path or the المرحلة.
+  A section that isn't in the Hierarchy is left empty and the row still imports
   (الحالة stays empty for it).
 
 ### Print (طباعة)
