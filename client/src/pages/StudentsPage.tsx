@@ -276,13 +276,17 @@ export default function StudentsPage() {
       );
       const byPath = leaves.filter((l) => norm(l.path) === norm(section!));
       const candidates = byPath.length > 0 ? byPath : leaves.filter((l) => norm(l.name) === norm(section!));
-      if (candidates.length === 0) return { error: `صف غير معروف "${section}"${division ? ` في "${division}"` : ""}` };
       if (candidates.length > 1) {
         return { error: `الصف "${section}" موجود في أكثر من مكان — اكتب المسار كاملاً أو أضف المرحلة` };
       }
-      levelId = candidates[0].id;
-      division = candidates[0].stage;
-      section = candidates[0].path;
+      // A section that isn't in the Hierarchy is left empty; the row still imports.
+      if (candidates.length === 0) {
+        section = undefined;
+      } else {
+        levelId = candidates[0].id;
+        division = candidates[0].stage;
+        section = candidates[0].path;
+      }
     }
     if (raw.className?.trim()) {
       const match = flattenTree(tree).find(

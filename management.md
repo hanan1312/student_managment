@@ -121,7 +121,8 @@ Opened from **إضافة مدرسة** on the Students ribbon. It lists the schoo
 - Older files with English headers still import.
 - Gender and religion accept Arabic or English values (e.g. ذكر/M, مسلم/Muslim).
 - The section column can hold either the full Hierarchy path or just the section name, if that
-  name is unique.
+  name is unique. A section that isn't in the Hierarchy is left empty and the row still imports
+  (الحالة stays empty for it).
 
 ### Print (طباعة)
 
