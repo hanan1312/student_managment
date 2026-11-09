@@ -253,6 +253,21 @@ that study it, and **each section has its own settings**:
 
 The marks can only be changed in المواد. They are read-only on the student's record.
 
+**الصفوف side list (right of the screen):** every stage and its sections, each with a checkbox and
+the number of subjects linked to it. It is separate from the form's section list.
+
+- Ticking a stage or section highlights its subjects in the table and scrolls down to the first
+  one. A stage, or a level with sub-levels, ticks every section under it. **إلغاء التحديد** clears it.
+- While sections are ticked, the table gets a checkbox per subject: ticked are the subjects linked
+  to **all** the ticked sections. A subject linked to only some of them shows e.g. `2/3`.
+- Tick or untick subjects, then **حفظ مواد الصفوف المحددة**: a ticked subject is linked to every
+  ticked section (new links have no النهايات yet: set them with edit), an unticked one is unlinked
+  from them, after a confirmation. Only the subjects whose box was changed are saved. The header
+  checkbox ticks every subject shown.
+
+**Search:** the box above the table filters subjects by name or التصنيف (ا / أ / إ, ى / ي and ة / ه
+are treated alike).
+
 **Import / Export (المواد header):** one row per subject and section: المادة, المرحلة, الصف (the
 section's full path, as exported), النهاية الكبرى, النهاية الصغرى, خارج المجموع (نعم / لا).
 

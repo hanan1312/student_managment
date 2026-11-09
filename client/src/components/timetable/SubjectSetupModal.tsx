@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, BookMarked, Pencil, Trash2 } from "lucide-react";
+import { X, BookMarked, Pencil, Search, Trash2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { levelAndDescendants, useClasses } from "../../context/ClassesContext";
 import { useHrEmployees } from "../../context/HrEmployeesContext";
@@ -109,6 +109,10 @@ function marksSummary(s: Subject, key: "max_degree" | "min_degree"): string {
   return values.length === 1 ? String(values[0]) : "متفاوتة";
 }
 
+// Search ignores the ا / أ / إ / آ, ى / ي and ة / ه spellings.
+const searchNorm = (v: string) =>
+  v.trim().toLowerCase().replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ");
+
 const markInputCls =
   "w-16 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs outline-none focus:border-brand-500 disabled:bg-slate-50 disabled:text-slate-300";
 
@@ -134,6 +138,13 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
   // Sections where this subject is خارج المجموع, and its choose-one group per section (read-only here).
   const [outside, setOutside] = useState<Set<number>>(new Set());
   const [electives, setElectives] = useState<Record<number, string>>({});
+  // The side list (الصفوف): sections ticked there highlight their subjects, and the table's
+  // checkboxes choose which subjects those sections have.
+  const [bundleIds, setBundleIds] = useState<Set<number>>(new Set());
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [savingBundle, setSavingBundle] = useState(false);
+  const [search, setSearch] = useState("");
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     if (!token) return;
@@ -286,6 +297,72 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
     }
   };
 
+  // A subject is ticked when it's linked to every section ticked in the side list.
+  const linkedToAll = (sub: Subject) => bundleIds.size > 0 && [...bundleIds].every((id) => sub.level_ids.includes(id));
+  const linkedToAny = (sub: Subject) => sub.level_ids.some((id) => bundleIds.has(id));
+  const initialPicked = useMemo(
+    () => new Set(subjects.filter(linkedToAll).map((sub) => sub.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [subjects, bundleIds]
+  );
+  useEffect(() => setPicked(initialPicked), [initialPicked]);
+  const bundleChanges = subjects.filter((sub) => picked.has(sub.id) !== initialPicked.has(sub.id));
+
+  const shownSubjects = useMemo(() => {
+    const q = searchNorm(search);
+    return q ? subjects.filter((sub) => searchNorm(`${sub.name} ${sub.category ?? ""}`).includes(q)) : subjects;
+  }, [subjects, search]);
+
+  const toggleBundle = (leafIds: number[]) =>
+    setBundleIds((prev) => {
+      const next = new Set(prev);
+      const all = leafIds.every((id) => next.has(id));
+      leafIds.forEach((id) => (all ? next.delete(id) : next.add(id)));
+      return next;
+    });
+
+  // Ticking a section in the side list scrolls down to its first subject.
+  useEffect(() => {
+    if (bundleIds.size === 0) return;
+    requestAnimationFrame(() => {
+      const target =
+        tableRef.current?.querySelector<HTMLElement>('[data-highlight="true"]') ?? tableRef.current ?? undefined;
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [bundleIds]);
+
+  const togglePicked = (id: number) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  // A ticked subject is linked to every ticked section (new links have no marks yet); an unticked
+  // one is unlinked from them. Only subjects whose box was changed are saved.
+  const saveBundle = async () => {
+    if (!token || bundleChanges.length === 0) return;
+    const removing = bundleChanges.filter((sub) => !picked.has(sub.id));
+    if (removing.length > 0 && !window.confirm(`إزالة ${removing.map((sub) => sub.name).join("، ")} من الصفوف المحددة؟`)) return;
+    setSavingBundle(true);
+    setError(null);
+    try {
+      for (const sub of bundleChanges) {
+        const ids = picked.has(sub.id)
+          ? [...new Set([...sub.level_ids, ...bundleIds])]
+          : sub.level_ids.filter((id) => !bundleIds.has(id));
+        await api.updateSubject(token, sub.id, { levelIds: ids });
+      }
+      if (editingId !== null && bundleChanges.some((sub) => sub.id === editingId)) resetForm();
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "تعذر الحفظ.");
+      await load();
+    } finally {
+      setSavingBundle(false);
+    }
+  };
+
   const levelName = (id: number) => levels.find((l) => l.id === id)?.level ?? "—";
   const [importOpen, setImportOpen] = useState(false);
 
@@ -371,7 +448,7 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
 
   return (
     <div className="animate-fade-in fixed inset-0 z-30 flex items-center justify-center bg-ink-950/60 p-4 backdrop-blur-sm">
-      <div className="animate-rise-in flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+      <div className="animate-rise-in flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
         <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-4">
           <div className="flex items-center gap-2">
             <BookMarked size={18} className="text-brand-600" />
@@ -384,6 +461,48 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
             </button>
           </div>
         </div>
+
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <aside className="max-h-48 shrink-0 overflow-y-auto border-b border-slate-100 bg-slate-50/60 p-2 md:max-h-none md:w-60 md:border-b-0 md:border-e">
+          <div className="mb-1.5 flex items-center justify-between px-1">
+            <span className="text-xs font-semibold text-slate-600">الصفوف</span>
+            {bundleIds.size > 0 && (
+              <button onClick={() => setBundleIds(new Set())} className="text-[11px] text-slate-400 hover:text-brand-600">
+                إلغاء التحديد
+              </button>
+            )}
+          </div>
+          {rows.map((row) => {
+            const leafIds = row.kind === "group" ? row.leafIds : [row.id];
+            const ticked = leafIds.filter((id) => bundleIds.has(id)).length;
+            const all = leafIds.length > 0 && ticked === leafIds.length;
+            const count = subjects.filter((sub) => sub.level_ids.some((id) => leafIds.includes(id))).length;
+            return (
+              <label
+                key={row.kind === "group" ? row.key : row.id}
+                className={`flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-white ${
+                  row.depth === 0 ? "mt-1 bg-white font-semibold text-slate-700 shadow-sm" : row.kind === "group" ? "font-medium text-slate-600" : "text-slate-600"
+                } ${all ? "ring-1 ring-amber-300" : ""}`}
+                style={{ paddingInlineStart: row.depth * 12 + 4 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={all}
+                  ref={(el) => {
+                    if (el) el.indeterminate = ticked > 0 && !all;
+                  }}
+                  disabled={leafIds.length === 0}
+                  onChange={() => toggleBundle(leafIds)}
+                  className="h-3.5 w-3.5 accent-brand-600"
+                />
+                <span className="flex-1 truncate">{row.label}</span>
+                <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-normal text-slate-500" title="عدد المواد">
+                  {count}
+                </span>
+              </label>
+            );
+          })}
+        </aside>
 
         <div ref={bodyRef} className="flex-1 overflow-y-auto px-5 py-4">
           {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
@@ -600,10 +719,53 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
             </button>
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
+          <div ref={tableRef} className="mt-5 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[12rem] flex-1">
+              <Search size={14} className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="بحث في المواد…"
+                className="w-full rounded-lg border border-slate-200 py-1.5 pe-3 ps-8 text-sm outline-none focus:border-brand-500"
+              />
+            </div>
+            {bundleIds.size > 0 && (
+              <>
+                <span className="text-xs text-slate-500">
+                  المواد المظللة مرتبطة بالصفوف المحددة ({bundleIds.size}) · علّم المواد التي تُدرَّس فيها
+                </span>
+                <button
+                  onClick={saveBundle}
+                  disabled={bundleChanges.length === 0 || savingBundle}
+                  className="rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 px-3.5 py-1.5 text-sm font-semibold text-white shadow-md shadow-brand-600/25 disabled:opacity-40"
+                >
+                  حفظ مواد الصفوف المحددة{bundleChanges.length > 0 ? ` (${bundleChanges.length})` : ""}
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="mt-2 overflow-hidden rounded-xl border border-slate-200">
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-start text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
+                  {bundleIds.size > 0 && (
+                    <th className="w-8 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={shownSubjects.length > 0 && shownSubjects.every((sub) => picked.has(sub.id))}
+                        onChange={(e) =>
+                          setPicked((prev) => {
+                            const next = new Set(prev);
+                            shownSubjects.forEach((sub) => (e.target.checked ? next.add(sub.id) : next.delete(sub.id)));
+                            return next;
+                          })
+                        }
+                        title="تحديد كل المواد المعروضة"
+                        className="h-3.5 w-3.5 accent-brand-600"
+                      />
+                    </th>
+                  )}
                   <th className="px-3 py-2">#</th>
                   {subjectColumns.order.map((key) => (
                     <th key={key} {...subjectColumns.headerProps(key)} className="px-3 py-2">
@@ -616,27 +778,46 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
               <tbody className="divide-y divide-slate-100">
                 {loading && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
+                    <td colSpan={9} className="px-3 py-6 text-center text-slate-400">
                       جارٍ التحميل…
                     </td>
                   </tr>
                 )}
-                {!loading && subjects.length === 0 && (
+                {!loading && shownSubjects.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
-                      لا توجد مواد بعد.
+                    <td colSpan={9} className="px-3 py-6 text-center text-slate-400">
+                      {subjects.length === 0 ? "لا توجد مواد بعد." : "لا توجد مواد مطابقة للبحث."}
                     </td>
                   </tr>
                 )}
                 {!loading &&
-                  subjects.map((s, i) => (
-                    <tr key={s.id} className="hover:bg-slate-50">
+                  shownSubjects.map((s, i) => (
+                    <tr
+                      key={s.id}
+                      data-highlight={bundleIds.size > 0 && linkedToAny(s)}
+                      className={bundleIds.size > 0 && linkedToAny(s) ? "bg-amber-50 hover:bg-amber-100/70" : "hover:bg-slate-50"}
+                    >
+                      {bundleIds.size > 0 && (
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={picked.has(s.id)}
+                            onChange={() => togglePicked(s.id)}
+                            className="h-3.5 w-3.5 accent-brand-600"
+                          />
+                        </td>
+                      )}
                       <td className="px-3 py-2 text-slate-500">{i + 1}</td>
                       {orderedCells(subjectColumns.order, {
                         name: (
                           <td className="px-3 py-2 font-medium text-slate-800">
                             <span className="me-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: s.color ?? "#94a3b8" }} />
                             {s.name}
+                            {bundleIds.size > 1 && linkedToAny(s) && !linkedToAll(s) && (
+                              <span className="ms-1.5 rounded bg-amber-100 px-1 text-[10px] text-amber-700" title="مرتبطة ببعض الصفوف المحددة فقط">
+                                {s.level_ids.filter((id) => bundleIds.has(id)).length}/{bundleIds.size}
+                              </span>
+                            )}
                           </td>
                         ),
                         level: (
@@ -668,6 +849,7 @@ export default function SubjectSetupModal({ onClose }: { onClose: () => void }) 
               </tbody>
             </table>
           </div>
+        </div>
         </div>
 
         <div className="flex justify-end border-t border-slate-100 px-5 py-4">
