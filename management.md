@@ -128,6 +128,11 @@ Opened from **إضافة مدرسة** on the Students ribbon. It lists the schoo
   wins; a value that fits more than one الصف is an error asking for the full path or the المرحلة.
   A section that isn't in the Hierarchy is left empty and the row still imports (الحالة stays
   empty for it).
+- **Duplicates:** before anything is saved, rows that are already students of the open year (same
+  الرقم القومي, same كود الحكومة الالكترونية, or the same name in the same الصف), or repeat an
+  earlier row of the file, are listed with the reason. Choose **تخطي المكرر** (they're skipped and
+  marked "مكرر — تم التخطي" in the preview), **إضافتهم أيضًا** (added anyway) or **رجوع** (back to
+  the preview, nothing saved).
 - **Degrees in the students file:** columns after الصف that aren't student fields and hold numbers
   are read as subjects, one per column, named by the header (e.g. اللغة العربية، الرياضيات). They
   show in the preview. On import:

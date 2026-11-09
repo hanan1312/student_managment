@@ -32,7 +32,7 @@ import { useUiControl } from "../lib/uiControl";
 import { passStatus } from "../lib/degrees";
 import { ageOn, ageReferenceDate } from "../lib/studentAge";
 import { birthdayFromNationalId } from "../lib/nationalId";
-import { toNumber } from "../lib/importValues";
+import { sameName, toNumber } from "../lib/importValues";
 import { useSettings } from "../context/SettingsContext";
 import type { AdmissionInput, ClassStage, FeeType, PaymentInput, Student, StudentInput, Subject } from "../lib/types";
 import StudentFormModal from "../components/StudentFormModal";
@@ -172,6 +172,52 @@ function subjectImportColumns(
     .filter((h, i) => i > sectionAt && !keyOf(h) && !h.startsWith("__EMPTY") && !NOT_SUBJECT_HEADERS.has(arNorm(h)))
     .filter((h) => rows.some((r) => toNumber(r[h]) !== null) && rows.every((r) => isNoDegree(r[h]) || toNumber(r[h]) !== null))
     .map((h) => ({ key: `subject:${h}`, label: h }));
+}
+
+// A row is a duplicate when its الرقم القومي or كود الحكومة الالكترونية is already a student's, or
+// a student with the same name is in the same الصف; earlier rows of the same file count too.
+type DuplicateRow = { rowNumber: number; name: string; reason: string };
+const idDigits = (v: string | null | undefined) =>
+  (v ?? "").replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/\D/g, "");
+
+function findDuplicates(rows: MappedRow<StudentImport>[], existing: Student[]): DuplicateRow[] {
+  type Known = { name: string; nationalId: string; moeCode: string; levelId: number | null; where: string };
+  const known: Known[] = existing.map((st) => ({
+    name: st.name,
+    nationalId: idDigits(st.national_id),
+    moeCode: idDigits(st.moe_code),
+    levelId: st.level_id,
+    where: `موجود: ${st.name}`,
+  }));
+  const out: DuplicateRow[] = [];
+  for (const r of rows) {
+    if (!r.input || r.error) continue;
+    const st = r.input.student;
+    const row: Known = {
+      name: st.name,
+      nationalId: idDigits(st.nationalId),
+      moeCode: idDigits(st.moeCode),
+      levelId: st.levelId ?? null,
+      where: `مكرر في الملف (الصف ${r.rowNumber})`,
+    };
+    const match = known.find(
+      (k) =>
+        (row.nationalId && k.nationalId === row.nationalId) ||
+        (row.moeCode && k.moeCode === row.moeCode) ||
+        (sameName(k.name, row.name) && k.levelId === row.levelId)
+    );
+    if (match) {
+      const by =
+        row.nationalId && match.nationalId === row.nationalId
+          ? "نفس الرقم القومي"
+          : row.moeCode && match.moeCode === row.moeCode
+          ? "نفس كود الحكومة الالكترونية"
+          : "نفس الاسم والصف";
+      out.push({ rowNumber: r.rowNumber, name: st.name, reason: `${by} · ${match.where}` });
+    }
+    known.push(row);
+  }
+  return out;
 }
 
 const STUDENT_IMPORT_COLUMNS: ImportColumn[] = [
@@ -378,6 +424,35 @@ export default function StudentsPage() {
       setErrorMsg(err instanceof ApiError ? err.message : "تعذر تحديث المواد.");
       return null;
     }
+  };
+
+  // Duplicates are listed before anything is saved: add them anyway, skip them, or go back.
+  const [duplicateAsk, setDuplicateAsk] = useState<{
+    rows: DuplicateRow[];
+    resolve: (choice: "all" | "skip" | null) => void;
+  } | null>(null);
+
+  const beforeStudentImport = async (rows: MappedRow<StudentImport>[]): Promise<MappedRow<StudentImport>[] | null> => {
+    if (!token) return null;
+    let duplicates: DuplicateRow[];
+    try {
+      const { students: existing } = await api.getStudents(token);
+      duplicates = findDuplicates(rows, existing);
+    } catch (err) {
+      setErrorMsg(err instanceof ApiError ? err.message : "تعذر التحقق من الطلاب المكررين.");
+      return null;
+    }
+    let result = rows;
+    if (duplicates.length > 0) {
+      const choice = await new Promise<"all" | "skip" | null>((resolve) => setDuplicateAsk({ rows: duplicates, resolve }));
+      setDuplicateAsk(null);
+      if (!choice) return null;
+      if (choice === "skip") {
+        const skipped = new Set(duplicates.map((d) => d.rowNumber));
+        result = rows.map((r) => (skipped.has(r.rowNumber) ? { ...r, error: "مكرر — تم التخطي" } : r));
+      }
+    }
+    return syncImportSubjects(result);
   };
 
   const importStudentRow = async ({ student, grades }: StudentImport) => {
@@ -751,7 +826,7 @@ export default function StudentsPage() {
           columns={STUDENT_IMPORT_COLUMNS}
           fileColumns={subjectImportColumns}
           mapRow={mapStudentImportRow}
-          onBeforeImport={syncImportSubjects}
+          onBeforeImport={beforeStudentImport}
           onImportRow={importStudentRow}
           onClose={() => setImportOpen(false)}
           onFinished={() => {
@@ -759,6 +834,46 @@ export default function StudentsPage() {
             broadcastChange("students");
           }}
         />
+      )}
+
+      {duplicateAsk && (
+        <div className="animate-fade-in fixed inset-0 z-40 flex items-center justify-center bg-ink-950/60 p-4 backdrop-blur-sm">
+          <div className="animate-rise-in flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h2 className="text-base font-semibold text-slate-800">طلاب مكررون ({duplicateAsk.rows.length})</h2>
+              <p className="text-xs text-slate-500">هذه الصفوف موجودة بالفعل أو مكررة في الملف. هل تريد إضافتها؟</p>
+            </div>
+            <ul className="flex-1 divide-y divide-slate-50 overflow-y-auto px-5 py-2 text-xs">
+              {duplicateAsk.rows.map((d) => (
+                <li key={d.rowNumber} className="py-1.5">
+                  <span className="text-slate-400">الصف {d.rowNumber}: </span>
+                  <span className="font-medium text-slate-700">{d.name}</span>
+                  <span className="text-amber-700"> — {d.reason}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <button
+                onClick={() => duplicateAsk.resolve(null)}
+                className="rounded-lg border border-slate-200 px-3.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                رجوع
+              </button>
+              <button
+                onClick={() => duplicateAsk.resolve("all")}
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+              >
+                إضافتهم أيضًا
+              </button>
+              <button
+                onClick={() => duplicateAsk.resolve("skip")}
+                className="rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-brand-600/25"
+              >
+                تخطي المكرر
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pendingDelete.length > 0 && (
