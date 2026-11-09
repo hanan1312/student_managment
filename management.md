@@ -13,6 +13,14 @@ Inventory, HR & Staff, and the extra student tabs and fields) is **hidden, not d
 and code are kept and can be switched back on with one setting (`SHOW_EXTENDED_FEATURES` in
 `client/src/lib/features.ts`).
 
+**Home page:** after signing in the app opens on a home page: a card per section (**شئون الطلاب**,
+listing its tabs) that opens the section, and under it a welcome text. The text is set in
+**التحكم → الصفحة الرئيسية → نص الترحيب** (default "أهلًا وسهلًا بكم في إدارة {الإدارة} بمدينة
+{المدينة}"): {الإدارة} and {المدينة} are replaced by the signed-in user's إدارة تعليمية and مدينة from
+**المستخدمين** (a leading "إدارة" in the name isn't repeated). An account without them (e.g. admin)
+uses the ones all schools share, if they share one. The school's logo and name in the top bar lead
+back to the home page. The students list is now at `/students`.
+
 Visible today:
 
 - **شئون الطلاب → الطلاب**, with the ribbon buttons: طالب جديد، استيراد، تصدير، طباعة، المواد، ملف الدرجات، إضافة مدرسة، المستخدمين.
@@ -297,8 +305,8 @@ On the student's **ملف الدرجات** tab, or by clicking a student's row i
 - Degrees are kept to **two decimals**: a typed or imported 45.666 is saved as 45.67, and مجموع
   الدرجات is rounded the same way. Degrees saved before this were rounded once.
 - Totals: **مجموع الدرجات**, **النسبة المئوية** and **الحالة**.
-- **الدور:** الأول / الثاني, chosen like الديانة above the subjects (click the chosen one again to
-  clear it) and saved with **حفظ الدرجات**. It is the same الدور the official result forms print, and
+- **الدور:** الأول / الثاني, chosen like الديانة above the subjects and saved with
+  **حفظ الدرجات** (its message names the الدور saved). It is the same الدور the official result forms print, and
   a column (off until ticked) in the Students table, ملف الدرجات and Export. Import reads a الدور
   column: اول / أول / 1 → الأول, ثاني / ثان / 2 → الثاني.
 - **طباعة الشهادة** opens the certificate print preview (see below).

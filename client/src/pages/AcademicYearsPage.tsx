@@ -82,7 +82,7 @@ export default function AcademicYearsPage() {
       () => {
         // Other open windows of the app reload their students for the new year.
         broadcastChange("students");
-        navigate("/");
+        navigate("/students");
       }
     );
   const archive = (year: AcademicYear) => {

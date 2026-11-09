@@ -46,6 +46,7 @@ export function parseUiControl(raw: string | undefined): UiControl {
 }
 
 export const TEXT_GROUPS = [
+  { key: "home", label: "الصفحة الرئيسية" },
   { key: "sections", label: "الأقسام الرئيسية" },
   { key: "ribbon", label: "أزرار شريط الطلاب" },
   { key: "print", label: "نصوص الطباعة (PDF)" },
@@ -55,6 +56,12 @@ type TextDef = { group: (typeof TEXT_GROUPS)[number]["key"]; label: string; defa
 
 // Every text التحكم can change. The tab names are edited with the tabs themselves.
 export const TEXTS = {
+  // {الإدارة} and {المدينة} are the signed-in user's إدارة تعليمية and مدينة (see welcomeText).
+  "home.welcome": {
+    group: "home",
+    label: "نص الترحيب",
+    default: "أهلًا وسهلًا بكم في إدارة {الإدارة} بمدينة {المدينة}",
+  },
   "section.studentsAffair": { group: "sections", label: "قسم شئون الطلاب", default: "شئون الطلاب" },
   "section.hrStaff": { group: "sections", label: "قسم شئون العاملين", default: "شئون العاملين" },
   "ribbon.caption": { group: "ribbon", label: "عنوان مجموعة الأزرار", default: "الطلاب" },
@@ -76,6 +83,17 @@ export const TEXTS = {
 } satisfies Record<string, TextDef>;
 
 export type TextKey = keyof typeof TEXTS;
+
+// The welcome text with {الإدارة} and {المدينة} filled in. The name of the إدارة is used without
+// a leading "إدارة", since the text says it (e.g. "إدارة جنوب" → "في إدارة جنوب").
+export function welcomeText(template: string, place: { admin: string; city: string }): string {
+  const admin = place.admin.trim().replace(/^[اإأ]دار[ةه]\s+/, "");
+  return template
+    .replace(/\{\s*ال[اإأ]دار[ةه]\s*\}/g, admin)
+    .replace(/\{\s*المدين[ةه]\s*\}/g, place.city.trim())
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 export type AppTab = {
   key: string;

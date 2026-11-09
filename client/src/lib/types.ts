@@ -4,6 +4,9 @@ export type User = {
   full_name: string;
   role: string;
   modules: string[];
+  // From المستخدمين (none for the master account).
+  city_name?: string | null;
+  education_admin_name?: string | null;
 };
 
 export type PresenceEntry = {

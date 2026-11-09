@@ -14,6 +14,14 @@ import ChangePasswordModal from "./ChangePasswordModal";
 import { roleLabel } from "./SystemUserModal";
 import Copyright from "./Copyright";
 
+// What the pages get from the layout (useOutletContext). The home page opens a section with
+// goToSection, as the section tabs do.
+export type LayoutContext = {
+  notify: (label: string) => void;
+  goToSection: (key: SectionKey) => void;
+  sections: { key: SectionKey; label: string; tabs: AppTab[] }[];
+};
+
 function sectionForPath(tabs: AppTab[], pathname: string): SectionKey {
   const match = tabs.find((m) => m.path === pathname || (m.path !== "/" && pathname.startsWith(m.path)));
   return match?.section ?? "studentsAffair";
@@ -102,6 +110,19 @@ export default function DashboardLayout() {
     if (target) navigate(target.path);
   };
 
+  // The home page ("/") shows the sections as cards: no section is active and there's no tab row
+  // or tree beside it.
+  const isHome = pathname === "/";
+  const layoutContext: LayoutContext = {
+    notify: (label: string) => notify(label),
+    goToSection,
+    sections: visibleSections.map((s) => ({
+      key: s.key,
+      label: ui.sectionLabel(s.key),
+      tabs: navTabs.filter((m) => m.section === s.key),
+    })),
+  };
+
   const schoolName = settings.school_name || "SchoolSuite";
   const logoUrl = assetUrl(settings.logo_url);
   const backgroundUrl = assetUrl(settings.background_url);
@@ -117,7 +138,8 @@ export default function DashboardLayout() {
 
       <header className="relative z-10 flex items-center justify-between overflow-hidden border-b border-slate-200 bg-gradient-to-r from-ink-950 via-ink-900 to-brand-900 px-4 py-2.5 shadow-md">
         <div className="animate-float-slow pointer-events-none absolute -start-10 -top-12 h-32 w-32 rounded-full bg-brand-400/10 blur-3xl" />
-        <div className="relative flex items-center gap-2.5">
+        {/* The logo and name lead back to the home page. */}
+        <button onClick={() => navigate("/")} title="الصفحة الرئيسية" className="relative flex items-center gap-2.5">
           {logoUrl ? (
             <img
               src={logoUrl}
@@ -130,7 +152,7 @@ export default function DashboardLayout() {
             </div>
           )}
           <span className="text-base font-semibold tracking-tight text-gold-300">{schoolName}</span>
-        </div>
+        </button>
 
         <div className="relative flex items-center gap-3">
           <div className="relative">
@@ -200,7 +222,7 @@ export default function DashboardLayout() {
             key={s.key}
             onClick={() => goToSection(s.key)}
             className={`relative shrink-0 rounded-t-lg px-4 py-1.5 text-sm font-medium transition ${
-              activeSection === s.key
+              !isHome && activeSection === s.key
                 ? "bg-white text-brand-700 shadow-[0_-1px_0_rgba(15,23,42,0.04)]"
                 : "text-slate-500 hover:bg-white/60 hover:text-slate-700"
             }`}
@@ -210,6 +232,7 @@ export default function DashboardLayout() {
         ))}
       </div>
 
+      {!isHome && (
       <nav className="relative z-10 flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-white/95 px-3 py-1.5 shadow-sm backdrop-blur-sm">
         {sectionModules.map(({ tab: m, depth }) => {
           const Icon = m.icon;
@@ -262,6 +285,7 @@ export default function DashboardLayout() {
           );
         })}
       </nav>
+      )}
 
       {notice && (
         <div className="animate-scale-in absolute end-4 top-16 z-20 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 shadow-lg shadow-amber-900/10">
@@ -270,6 +294,7 @@ export default function DashboardLayout() {
       )}
 
       <div className="relative z-10 flex min-h-0 flex-1">
+        {!isHome && (
         <aside
           className={`hidden shrink-0 border-e border-slate-200 bg-white/95 shadow-sm transition-[width] duration-200 md:block ${
             sidebarCollapsed ? "w-12" : "w-80"
@@ -284,10 +309,11 @@ export default function DashboardLayout() {
             <ClassTree collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((v) => !v)} />
           )}
         </aside>
+        )}
 
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div key={pathname} className="animate-fade-in h-full">
-            <Outlet context={{ notify }} />
+            <Outlet context={layoutContext} />
           </div>
         </main>
       </div>

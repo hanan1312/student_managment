@@ -34,7 +34,7 @@ export type ModuleDef = {
 };
 
 export const MODULES: ModuleDef[] = [
-  { key: "students", label: "الطلاب", icon: Users, path: "/", section: "studentsAffair" },
+  { key: "students", label: "الطلاب", icon: Users, path: "/students", section: "studentsAffair" },
   { key: "finance", label: "المالية", icon: Wallet, path: "/finance", section: "studentsAffair" },
   { key: "control", label: "المستخدمين", icon: ShieldCheck, path: "/users", section: "studentsAffair" },
   { key: "inventory", label: "المخازن", icon: Package, path: "/inventory", section: "studentsAffair" },

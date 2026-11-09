@@ -34,7 +34,7 @@ export default function StudentDegreesEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
-  // الدور (الأول / الثاني), saved with the degrees; clicking the chosen one again clears it.
+  // الدور (الأول / الثاني), saved with the degrees.
   const [round, setRound] = useState(() => studentRound(student.form_fields));
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function StudentDegreesEditor({
         liveGrades.map((g) => ({ subjectId: g.subject_id, score: g.score, scoreMin: null })),
         round
       );
-      setMessage("تم حفظ الدرجات.");
+      setMessage(round ? `تم حفظ الدرجات والدور (${round}).` : "تم حفظ الدرجات.");
       onRoundSaved?.(round);
       onSaved?.();
     } catch (err) {
@@ -105,7 +105,7 @@ export default function StudentDegreesEditor({
             <button
               key={r}
               type="button"
-              onClick={() => setRound((cur) => (cur === r ? "" : r))}
+              onClick={() => setRound(r)}
               className={`flex-1 rounded-md py-1 text-sm font-medium transition ${
                 round === r ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}

@@ -9,6 +9,7 @@ import { HrEmployeesProvider } from "./context/HrEmployeesContext";
 import { HrOrgProvider } from "./context/HrOrgContext";
 import LoginPage from "./pages/LoginPage";
 import StudentsPage from "./pages/StudentsPage";
+import HomePage from "./pages/HomePage";
 import FinancePage from "./pages/FinancePage";
 import TimeTablePage from "./pages/TimeTablePage";
 import BusesPage from "./pages/BusesPage";
@@ -75,8 +76,9 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<ProtectedArea />}>
+            <Route index element={<HomePage />} />
             <Route
-              index
+              path="students"
               element={
                 <RequireModule moduleKey="students">
                   <StudentsPage />

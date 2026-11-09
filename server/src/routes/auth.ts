@@ -166,6 +166,7 @@ authRouter.post("/login", (req, res) => {
       full_name: user.full_name,
       role: user.role,
       modules: getUserModules(user.id, user.role),
+      ...userPlace(user.id),
     },
   });
 });
@@ -183,6 +184,19 @@ authRouter.post("/logout", requireAuth, (req: AuthedRequest, res) => {
   });
   res.status(204).send();
 });
+
+// The user's مدينة and إدارة تعليمية (المستخدمين), for the home page's welcome text.
+function userPlace(userId: number): { city_name: string | null; education_admin_name: string | null } {
+  const row = db
+    .prepare(
+      `SELECT cities.name AS city_name, education_admins.name AS education_admin_name FROM users
+       LEFT JOIN cities ON cities.id = users.city_id
+       LEFT JOIN education_admins ON education_admins.id = users.education_admin_id
+       WHERE users.id = ?`
+    )
+    .get(userId) as { city_name: string | null; education_admin_name: string | null } | undefined;
+  return { city_name: row?.city_name ?? null, education_admin_name: row?.education_admin_name ?? null };
+}
 
 authRouter.get("/me", requireAuth, (req: AuthedRequest, res) => {
   if (req.user?.role === "master") {
@@ -202,7 +216,7 @@ authRouter.get("/me", requireAuth, (req: AuthedRequest, res) => {
     | undefined;
   if (!row) return res.status(401).json({ error: "User not found" });
 
-  res.json({ user: { ...row, modules: getUserModules(row.id, row.role) } });
+  res.json({ user: { ...row, modules: getUserModules(row.id, row.role), ...userPlace(row.id) } });
 });
 
 // Same self-service change as /change-password below, but reachable from the Login page
