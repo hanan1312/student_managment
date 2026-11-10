@@ -2,8 +2,8 @@ import { Router } from "express";
 import path from "path";
 import fs from "fs";
 import { db } from "../db";
-import { requireAuth } from "../auth";
-import { requireModule } from "../permissions";
+import { requireAuth, type AuthedRequest } from "../auth";
+import { requireModule, getStageScope } from "../permissions";
 import { currentAcademicYearId, setCurrentAcademicYear, type AcademicYear } from "../academicYears";
 
 // العام الدراسي tab: one card per year. Opening a year makes the app work in it (its students in
@@ -18,15 +18,23 @@ function allSettings() {
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
 
-function listResponse() {
+// A user limited to some stages (المراحل) only counts the students of those stages.
+function listResponse(req: AuthedRequest) {
   const currentId = currentAcademicYearId();
+  const scope = getStageScope(req.user);
+  const scopeSql =
+    scope === null
+      ? ""
+      : scope.length === 0
+        ? " AND 0=1"
+        : ` AND s.level_id IN (SELECT id FROM levels WHERE stage_id IN (${scope.map(() => "?").join(",")}))`;
   const years = (
     db
       .prepare(
-        `SELECT y.*, (SELECT COUNT(*) FROM students s WHERE s.academic_year_id = y.id) AS student_count
+        `SELECT y.*, (SELECT COUNT(*) FROM students s WHERE s.academic_year_id = y.id${scopeSql}) AS student_count
          FROM academic_years y ORDER BY y.sort_order ASC, y.id ASC`
       )
-      .all() as (AcademicYear & { student_count: number })[]
+      .all(...(scope ?? [])) as (AcademicYear & { student_count: number })[]
   ).map((y) => ({ ...y, archived: Boolean(y.archived) }));
   return { years, currentId, settings: allSettings() };
 }
@@ -42,8 +50,8 @@ function nameTaken(name: string, exceptId?: number): boolean {
 }
 
 // Every signed-in user can see the years and which one is open (the app header shows it).
-academicYearsRouter.get("/", requireAuth, (_req, res) => {
-  res.json(listResponse());
+academicYearsRouter.get("/", requireAuth, (req, res) => {
+  res.json(listResponse(req));
 });
 
 academicYearsRouter.post("/", requireAuth, requireModule("academicYears"), (req, res) => {
@@ -52,7 +60,7 @@ academicYearsRouter.post("/", requireAuth, requireModule("academicYears"), (req,
   if (nameTaken(name)) return res.status(409).json({ error: "هذا العام الدراسي موجود بالفعل" });
   const maxOrder = (db.prepare("SELECT MAX(sort_order) AS m FROM academic_years").get() as { m: number | null }).m ?? -1;
   db.prepare("INSERT INTO academic_years (name, sort_order) VALUES (?, ?)").run(name, maxOrder + 1);
-  res.status(201).json(listResponse());
+  res.status(201).json(listResponse(req));
 });
 
 academicYearsRouter.put("/:id", requireAuth, requireModule("academicYears"), (req, res) => {
@@ -64,7 +72,7 @@ academicYearsRouter.put("/:id", requireAuth, requireModule("academicYears"), (re
   if (nameTaken(name, id)) return res.status(409).json({ error: "هذا العام الدراسي موجود بالفعل" });
   db.prepare("UPDATE academic_years SET name = ? WHERE id = ?").run(name, id);
   if (currentAcademicYearId() === id) setCurrentAcademicYear(id);
-  res.json(listResponse());
+  res.json(listResponse(req));
 });
 
 // عرض بيانات العام الدراسي: the app works in this year from now on. An archived year is taken out
@@ -76,7 +84,7 @@ academicYearsRouter.post("/:id/open", requireAuth, requireModule("academicYears"
     db.prepare("UPDATE academic_years SET archived = 0 WHERE id = ?").run(id);
     setCurrentAcademicYear(id);
   })();
-  res.json(listResponse());
+  res.json(listResponse(req));
 });
 
 // ارشيف: the year's data is kept but can't be opened until the year is opened again. The year
@@ -88,7 +96,7 @@ academicYearsRouter.post("/:id/archive", requireAuth, requireModule("academicYea
     return res.status(409).json({ error: "لا يمكن أرشفة العام المفتوح حاليًا. افتح عامًا آخر أولاً." });
   }
   db.prepare("UPDATE academic_years SET archived = 1 WHERE id = ?").run(id);
-  res.json(listResponse());
+  res.json(listResponse(req));
 });
 
 // Deletes the chosen years with their students (and, through the foreign key, their degrees).
@@ -111,5 +119,5 @@ academicYearsRouter.delete("/", requireAuth, requireModule("academicYears"), (re
   for (const { photo_url } of photos) {
     if (photo_url.startsWith("/uploads/")) fs.unlink(path.join(UPLOADS_DIR, path.basename(photo_url)), () => {});
   }
-  res.json(listResponse());
+  res.json(listResponse(req));
 });

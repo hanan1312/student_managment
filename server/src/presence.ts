@@ -23,6 +23,8 @@ function nowIso() {
 }
 
 export function touchPresenceOnLogin(identity: { username: string; fullName: string; role: string }) {
+  // The master account is never listed anywhere other users can see it (like the audit log).
+  if (identity.role === "master") return;
   const now = nowIso();
   db.prepare(
     `INSERT INTO user_presence
@@ -121,7 +123,7 @@ export function listPresence(): PresenceEntry[] {
   reconcileStale();
   const rows = db
     .prepare(
-      `SELECT * FROM user_presence
+      `SELECT * FROM user_presence WHERE role != 'master'
        ORDER BY CASE status WHEN 'online' THEN 0 WHEN 'idle' THEN 1 ELSE 2 END, login_at DESC`
     )
     .all() as PresenceRow[];

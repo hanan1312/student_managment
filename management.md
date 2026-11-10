@@ -208,6 +208,7 @@ set up) is shared by every year and is never reset when a year is added or opene
   replaced by this one (its hidden / يتبع / name settings were kept).
 - Who can add, open, archive or delete years: admins, the master account, and users given
   **العام الدراسي** in إدارة الصلاحيات.
+- A user limited to some المراحل sees each card's student count for those stages only.
 
 ---
 
@@ -497,8 +498,20 @@ Opened with the lock icon on a user's row (admins and the master account only).
     student out of them. Students with no placement are outside their stages;
   - can't add a new stage or edit another stage's part of the tree;
   - in المواد, sees and edits only their stages' sections of a subject. They can't rename or
-    delete a subject that other stages also use.
+    delete a subject that other stages also use;
+  - in العام الدراسي, sees each year's student count for their stages only.
+- **التحكم and الإعدادات** are hidden completely from a user who wasn't given them: no tab (not even
+  a greyed-out one), and opening their address leads to the home page. Other tabs a user can't open
+  still show greyed out.
 - Admins always have every module and every stage.
+
+### Master account (الحساب الرئيسي)
+
+- Signs in with the username and password in `server/master-account.json` (not in the database).
+  It has every module and every stage, and sees tabs hidden in التحكم (marked as hidden).
+- It is never shown to other users, admins included: not in المستخدمين, not in النشاط's online
+  list, and not in the activity log. Its password can't be changed or reset from the app.
+- No user can be given its role ("master"), and its username can't be taken by a user.
 - **First sign-in:** a new user, or one whose password was reset, must choose their own password
   before getting in. These users are marked "في انتظار أول دخول" in the list.
 
@@ -618,6 +631,8 @@ Clean-ups:
 
 - `SHOW_EXTENDED_FEATURES` hides or shows everything outside the core.
 - `CORE_MODULE_KEYS` lists the module tabs kept visible.
+- `HIDDEN_WITHOUT_ACCESS` lists the tabs (الإعدادات, التحكم) left out entirely, instead of greyed out,
+  for a user without access (`DashboardLayout.tsx`, `RequireModule` in `App.tsx`).
 
 **Server**
 
@@ -636,6 +651,7 @@ Clean-ups:
 | `server/src/academicYears.ts`, `server/src/routes/academicYears.ts` | The open year (`currentAcademicYearId`); list, add, rename, open, archive, delete. Students' list and `/degrees-overview` only return the open year |
 | `server/src/db.ts` | Also `migrateAcademicYears`, `migrateAcademicYearTab`, `syncCertificateSubjects` |
 | `server/src/routes/permissions.ts` | Modules and `stageIds` (`null` = every stage) per user |
+| `server/src/masterAccount.ts`, `server/src/presence.ts` | The master account (from `master-account.json`); it isn't recorded in `user_presence` (old rows are removed at start-up) or `activity_log`. `routes/users.ts` refuses the `master` role |
 
 **Client**
 

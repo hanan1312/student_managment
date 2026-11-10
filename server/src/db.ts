@@ -1409,3 +1409,5 @@ for (const school of db.prepare("SELECT id FROM schools").all() as { id: number 
 // recordActivity), but that doesn't retroactively clean up rows written before this was
 // added — do that once here so upgrading a running deployment clears them out too.
 db.prepare("DELETE FROM activity_log WHERE username = ? OR role = 'master'").run(masterAccount.username);
+// Same for the online list (النشاط): the master account's sessions are no longer recorded there.
+db.prepare("DELETE FROM user_presence WHERE username = ? OR role = 'master'").run(masterAccount.username);

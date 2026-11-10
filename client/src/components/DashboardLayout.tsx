@@ -8,6 +8,7 @@ import HrEmployeeTree from "./hr/HrEmployeeTree";
 import { useSettings } from "../context/SettingsContext";
 import { assetUrl } from "../lib/api";
 import { SECTIONS, type SectionKey } from "../lib/modules";
+import { HIDDEN_WITHOUT_ACCESS } from "../lib/features";
 import { orderWithChildren, useUiControl, type AppTab } from "../lib/uiControl";
 import BackgroundWatermark from "./BackgroundWatermark";
 import ChangePasswordModal from "./ChangePasswordModal";
@@ -92,7 +93,10 @@ export default function DashboardLayout() {
   // "Users" (key "control") stays a real, reachable module — it's just hidden from this tab
   // row per product request, not removed from permissions/routing (AppTab.inNav). Tabs hidden in
   // التحكم are left out for everyone but whoever manages التحكم.
-  const navTabs = ui.tabs.filter((m) => m.inNav && ui.isTabVisible(m.key));
+  // التحكم and الإعدادات are left out entirely for a user who can't open them.
+  const navTabs = ui.tabs.filter(
+    (m) => m.inNav && ui.isTabVisible(m.key) && !(HIDDEN_WITHOUT_ACCESS.includes(m.key) && !hasModule(m.key))
+  );
   const sectionModules = orderWithChildren(
     ui.config,
     navTabs.filter((m) => m.section === activeSection)

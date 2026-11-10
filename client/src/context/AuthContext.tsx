@@ -118,7 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [token]);
 
-  const hasModule = (key: string) => user?.role === "admin" || Boolean(user?.modules?.includes(key));
+  const hasModule = (key: string) =>
+    user?.role === "admin" || user?.role === "master" || Boolean(user?.modules?.includes(key));
 
   const value = useMemo(
     () => ({ user, token, loading, bootstrapping, error, login, logout, hasModule }),

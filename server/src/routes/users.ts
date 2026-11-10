@@ -8,6 +8,9 @@ import { masterAccount } from "../masterAccount";
 import { isStrongPassword } from "../passwords";
 
 export const usersRouter = Router();
+
+// "master" is the fixed account in master-account.json, never a role a listed user can hold.
+const MASTER_ROLE_ERROR = "لا يمكن منح دور الحساب الرئيسي لمستخدم";
 usersRouter.use(requireModule("control"));
 
 const SAFE_COLUMNS = `users.id, users.username, users.full_name, users.role, users.code, users.city_id,
@@ -54,6 +57,7 @@ usersRouter.post("/", requireAuth, (req: AuthedRequest, res) => {
   if (!b.fullName) return res.status(400).json({ error: "fullName is required" });
 
   const requestedRole = typeof b.role === "string" && b.role ? b.role : "staff";
+  if (requestedRole === "master") return res.status(400).json({ error: MASTER_ROLE_ERROR });
   if (requestedRole === "admin" && !isAdminOrMaster(req)) {
     return res.status(403).json({ error: "Only an admin can grant the admin role" });
   }
@@ -124,6 +128,7 @@ usersRouter.put("/:id", requireAuth, (req: AuthedRequest, res) => {
 
   const b = req.body ?? {};
   const requestedRole = typeof b.role === "string" && b.role ? b.role : existing.role;
+  if (requestedRole === "master") return res.status(400).json({ error: MASTER_ROLE_ERROR });
   if (requestedRole === "admin" && !requesterIsPrivileged) {
     return res.status(403).json({ error: "Only an admin can grant the admin role" });
   }
