@@ -452,8 +452,8 @@ added to (up to 4). They are remembered in this browser for the next printout; *
 the two defaults back. The defaults can be changed in **التحكم**.
 
 **الختم (stamp):** every printout with signatures has an empty, labelled place for the stamp under
-**مدير الإدارة** (or the last signature). Drag it in the preview to move it; the dashed outline is
-only shown in the preview. Its position is remembered in this browser; **مكانه الأصلي** puts it
+**مدير الإدارة** (or the last signature). Drag it in the preview to move it: it prints (and saves to
+PDF) where it was dropped. The dashed outline is only shown in the preview. Its position is remembered in this browser; **مكانه الأصلي** puts it
 back, and it can be turned off under التوقيعات. A caption saved as
 "مدير المدرسة" before the rename now shows as "مدير الإدارة". Signatures are on by default for certificates and off for the two tables.
 

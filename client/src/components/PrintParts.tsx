@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Plus, Printer, RotateCcw, X } from "lucide-react";
 import { useSettings } from "../context/SettingsContext";
@@ -371,7 +371,8 @@ export function StampBox() {
   return (
     <div
       className="stamp-box relative mx-auto mt-2 flex h-24 w-24 cursor-move touch-none select-none items-start justify-center rounded-full border-2 border-dashed border-slate-300 pt-1 text-[0.95em] font-semibold print:border-transparent"
-      style={{ transform: `translate(${stamp.x}px, ${stamp.y}px)` }}
+      // Through a variable so the print CSS, which drops every other transform, can keep this one.
+      style={{ "--stamp-offset": `translate(${stamp.x}px, ${stamp.y}px)`, transform: "var(--stamp-offset)" } as CSSProperties}
       title="اسحب لتحريك الختم"
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);

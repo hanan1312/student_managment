@@ -289,6 +289,11 @@ body {
     transform: none !important;
     box-shadow: none !important;
   }
+  /* الختم keeps the place it was dragged to (StampBox sets --stamp-offset) and its size. */
+  .print-modal-root .stamp-box {
+    transform: var(--stamp-offset, none) !important;
+    height: 6rem !important;
+  }
   .print-sheet {
     width: 100% !important;
     /* The page margin (the page itself has none; see PrintModalShell), repeated on every printed page. */
