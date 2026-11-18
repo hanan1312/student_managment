@@ -183,6 +183,19 @@ edited here like the ones users add.
   wins; a value that fits more than one الصف is an error asking for the full path or the المرحلة.
   A section that isn't in the Hierarchy is left empty and the row still imports (الحالة stays
   empty for it).
+- **الشعبة and المسار columns:** to place students on a شعبة, the file can have a **الشعبة** column
+  (e.g. البكالوريا المصرية) and an **المسار** column (the track inside it, e.g. الأعمال), with
+  **الصف** holding just the grade (e.g. الصف الثاني الثانوي). The student is placed on
+  الصف → الشعبة → المسار. Spelling is matched as above, and the word "شعبة" can be left out
+  ("علمي" finds "شعبة علمي").
+  - A شعبة without tracks needs no المسار. A شعبة that has tracks needs one; the row is rejected
+    with "فيها مسارات — اكتب المسار".
+  - المسار alone (no الشعبة) is looked up anywhere under the الصف.
+  - Rejected rows say why: a شعبة or مسار not found, or a شعبة found under more than one الصف
+    when الصف is empty.
+  - A الصف written as the full path of a place (as Export writes it) is used as it is, whatever
+    الشعبة / المسار say.
+  - **Export** writes الشعبة and المسار after الصف, so an exported file imports back unchanged.
 - **Duplicates:** before anything is saved, rows that are already students of the open year (same
   الرقم القومي, same كود الحكومة الالكترونية, or the same name in the same الصف), or repeat an
   earlier row of the file, are listed with the reason. Choose **تخطي المكرر** (they're skipped and

@@ -60,6 +60,15 @@ export function branchOf(tree: ClassStage[], division: string | null, section: s
   return "";
 }
 
+// A student's شعبة and المسار (the item inside the شعبة they're placed on, e.g. الأعمال in
+// البكالوريا المصرية), for Export; both empty when they aren't on a شعبة.
+export function branchAndTrack(tree: ClassStage[], division: string | null, section: string | null) {
+  const stage = tree.find((s) => s.stage === division);
+  const level = stage?.levels.find((l) => l.path === section);
+  const branch = branchOf(tree, division, section);
+  return { branch, track: branch && level && !level.is_branch ? level.level : "" };
+}
+
 // Levels a شعبة can be added to: any item that isn't a شعبة or inside one.
 export function branchTargets(levels: ClassLevel[]): ClassLevel[] {
   const inBranch = new Set<number>();

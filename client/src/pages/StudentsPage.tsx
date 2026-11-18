@@ -23,7 +23,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useClasses, type ClassSelection } from "../context/ClassesContext";
+import { branchAndTrack, levelAndDescendants, useClasses, type ClassSelection } from "../context/ClassesContext";
 import { api, ApiError } from "../lib/api";
 import { downloadExcel } from "../lib/excel";
 import { broadcastChange, useSyncListener } from "../lib/liveSync";
@@ -131,7 +131,7 @@ function arNorm(v: string): string {
     .replace(/\s+/g, " ");
 }
 
-const IMPORT_FILLER_WORDS = new Set(["المرحله", "مرحله", "الصف", "صف"]);
+const IMPORT_FILLER_WORDS = new Set(["المرحله", "مرحله", "الصف", "صف", "الشعبه", "شعبه", "المسار", "مسار"]);
 
 function arWords(v: string): string[] {
   return arNorm(v)
@@ -301,6 +301,10 @@ const STUDENT_IMPORT_COLUMNS: ImportColumn[] = [
   { key: "birthday", label: "تاريخ الميلاد", example: "2020-01-15", aliases: ["Birthday", "Birthday Date"] },
   { key: "division", label: "المرحلة", example: "رياض اطفال", aliases: ["Division"] },
   { key: "section", label: "الصف", example: "Kg1", aliases: ["Section"] },
+  // With a شعبة: الصف is the grade (الصف الثاني الثانوي), الشعبة the شعبة in it (البكالوريا المصرية)
+  // and المسار the track in the شعبة (الأعمال), when it has tracks.
+  { key: "branch", label: "الشعبة", aliases: ["شعبة", "شعبه", "الشعبه"] },
+  { key: "track", label: "المسار", aliases: ["مسار"] },
   { key: "school", label: "المدرسة", aliases: ["School"] },
   { key: "religion", label: "الديانة", example: "مسلم", aliases: ["Religion"] },
   { key: "enrollmentType", label: "نوع القيد", example: "مستجد", aliases: ["Enrollment Type"] },
@@ -622,10 +626,70 @@ export default function StudentsPage() {
         division = stageName;
       }
     }
+    // Position from الصف + الشعبة + المسار: the الصف names the grade, الشعبة a شعبة under it and
+    // المسار a track inside the شعبة ("الصف الثاني الثانوي" + "البكالوريا المصرية" + "الأعمال"). A الصف
+    // written as a full path of a place (as exported) is used as it is.
+    const branchTyped = raw.branch?.trim() || "";
+    const trackTyped = raw.track?.trim() || "";
+    const exactLeaf = section
+      ? tree.flatMap((st) =>
+          st.levels
+            .filter((l) => l.is_leaf && (!stageName || st.stage === stageName) && arNorm(l.path) === arNorm(section!))
+            .map((l) => ({ stage: st.stage, level: l }))
+        )
+      : [];
+    if ((branchTyped || trackTyped) && exactLeaf.length !== 1) {
+      const stagesIn = tree.filter((st) => !stageName || st.stage === stageName);
+      const where = [section, branchTyped, trackTyped].filter(Boolean).join(" / ");
+      // The grade: the الصف typed (any item not inside a شعبة), or the whole stage.
+      let pool = stagesIn.flatMap((st) => st.levels.map((l) => ({ stage: st, level: l })));
+      if (section) {
+        const typed = section;
+        const grades = firstMatches(
+          pool.filter((c) => !c.level.is_branch),
+          [
+            (c) => arNorm(c.level.path) === arNorm(typed),
+            (c) => arNorm(c.level.level) === arNorm(typed),
+            (c) => wordsWithin(typed, c.level.level),
+            (c) => wordsWithin(typed, c.level.path),
+          ]
+        );
+        if (grades.length === 0) return { error: `الصف "${section}" غير موجود في الهيكل` };
+        pool = grades.flatMap((g) =>
+          levelAndDescendants(g.stage.levels, g.level.id)
+            .filter((l) => l.id !== g.level.id)
+            .map((l) => ({ stage: g.stage, level: l }))
+        );
+      }
+      const byName = (typed: string) => [
+        (c: (typeof pool)[number]) => arWords(c.level.level).join(" ") === arWords(typed).join(" "),
+        (c: (typeof pool)[number]) => wordsWithin(typed, c.level.level),
+      ];
+      let target: (typeof pool)[number] | undefined;
+      if (branchTyped) {
+        const branches = firstMatches(pool.filter((c) => c.level.is_branch), byName(branchTyped));
+        if (branches.length === 0) return { error: `الشعبة "${branchTyped}" غير موجودة${section ? ` في "${section}"` : ""}` };
+        if (branches.length > 1) return { error: `الشعبة "${branchTyped}" موجودة في أكثر من صف — اكتب الصف` };
+        target = branches[0];
+        pool = levelAndDescendants(target.stage.levels, target.level.id)
+          .filter((l) => l.id !== target!.level.id)
+          .map((l) => ({ stage: target!.stage, level: l }));
+      }
+      if (trackTyped) {
+        const tracks = firstMatches(pool.filter((c) => c.level.is_leaf), byName(trackTyped));
+        if (tracks.length === 0) return { error: `المسار "${trackTyped}" غير موجود في "${where.replace(` / ${trackTyped}`, "")}"` };
+        if (tracks.length > 1) return { error: `المسار "${trackTyped}" موجود في أكثر من مكان — اكتب الصف والشعبة` };
+        target = tracks[0];
+      }
+      if (!target) return { error: `المكان "${where}" غير موجود في الهيكل` };
+      if (!target.level.is_leaf) return { error: `الشعبة "${target.level.level}" فيها مسارات — اكتب المسار` };
+      levelId = target.level.id;
+      division = target.stage.stage;
+      section = target.level.path;
+    } else if (section) {
     // Position: the Section names a leaf level, by its full path ("الصف الثاني الثانوي / البكالوريا
     // المصرية / الأعمال"), by its own name when that's unique, or by part of it ("الاول" →
     // "الصف الأول الإعدادي"); the matched Division narrows it.
-    if (section) {
       const typed = section;
       const leaves = tree.flatMap((st) =>
         st.levels
@@ -709,6 +773,8 @@ export default function StudentsPage() {
       "السن في ١ أكتوبر",
       "المرحلة",
       "الصف",
+      "الشعبة",
+      "المسار",
       "المدرسة",
       "الديانة",
       "نوع القيد",
@@ -720,6 +786,7 @@ export default function StudentsPage() {
       ...(SHOW_EXTENDED_FEATURES ? ["Tel-1", "Tel-2", "Address", "Category"] : []),
     ];
     const rows = students.map((s) => ({
+      ...(({ branch, track }) => ({ الشعبة: branch, المسار: track }))(branchAndTrack(tree, s.division, s.section)),
       م: s.seq_no,
       الاسم: s.name,
       النوع: genderLabel(s.gender),
