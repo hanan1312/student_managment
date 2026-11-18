@@ -13,7 +13,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import type { ClassLevel, ClassStage } from "../lib/types";
-import { useClasses, levelAndDescendants, levelLabel, visibleChildren, type ClassSelection } from "../context/ClassesContext";
+import { useClasses, levelAndDescendants, type ClassSelection } from "../context/ClassesContext";
 import { AddInline, RenameInline, ConfirmDeleteDialog, RowActionButton } from "./TreeControls";
 import { SHOW_EXTENDED_FEATURES } from "../lib/features";
 
@@ -193,8 +193,8 @@ function LevelRow({
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const active = selection.type === "level" && selection.levelId === level.id;
-  const children = visibleChildren(stage.levels, level.id);
-  const label = levelLabel(stage.levels, level);
+  const children = stage.levels.filter((l) => l.parent_id === level.id);
+  const label = level.level;
   // Classes only exist on leaves, and only show while SHOW_EXTENDED_FEATURES is on.
   const showClasses = SHOW_EXTENDED_FEATURES && children.length === 0;
   const expandable = children.length > 0 || showClasses || addingChild;
@@ -262,9 +262,10 @@ function LevelRow({
           ) : (
             <span className="w-[13px] shrink-0" />
           )}
-          <span className="truncate" title={level.is_branch ? "شعبة" : undefined}>
-            {label}
-          </span>
+          <span className="truncate">{label}</span>
+          {level.is_branch && (
+            <span className="shrink-0 rounded bg-amber-50 px-1 text-[10px] font-medium text-amber-700">شعبة</span>
+          )}
         </button>
         <RowActionButton
           title={`إضافة فرع داخل ${label}`}
@@ -464,7 +465,7 @@ function StageRow({
 
       {open && (
         <div className="ms-3 border-s border-slate-200 ps-2">
-          {visibleChildren(stage.levels, null).map((level) => (
+          {stage.levels.filter((level) => level.parent_id === null).map((level) => (
             <LevelRow key={level.id} stage={stage} level={level} selection={selection} onSelect={onSelect} />
           ))}
           {addingLevel && (

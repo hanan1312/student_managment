@@ -753,6 +753,21 @@ function migrateLevelsColumns() {
   if (!cols.includes("is_branch")) db.exec("ALTER TABLE levels ADD COLUMN is_branch INTEGER NOT NULL DEFAULT 0");
 }
 
+// The seeded secondary groups (البكالوريا المصرية, الثانوية العامة (نظام جديد)) are شعب, listed and
+// edited in إضافة شعبة like the ones users add. Runs once, so a group unmarked later stays so.
+function markSeededBranches() {
+  const flag = "marked_seeded_branches_v1";
+  if (db.prepare("SELECT 1 FROM settings WHERE key = ?").get(flag)) return;
+  const loose = (t: string) => t.replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, "");
+  const names = ["البكالوريا المصرية", "الثانوية العامة (نظام جديد)"].map(loose);
+  const rows = db.prepare("SELECT id, name FROM levels WHERE parent_id IS NOT NULL").all() as { id: number; name: string }[];
+  const mark = db.prepare("UPDATE levels SET is_branch = 1 WHERE id = ?");
+  db.transaction(() => {
+    for (const r of rows) if (names.includes(loose(r.name))) mark.run(r.id);
+    db.prepare("INSERT INTO settings (key, value) VALUES (?, '1')").run(flag);
+  })();
+}
+
 // The Egyptian secondary tree (البكالوريا المصرية / الثانوية العامة نظام جديد, per the Ministry's
 // charts) with its subjects. Runs once (settings flag), adding only what's missing by name, so a
 // school that renames or deletes parts of it afterwards keeps its changes.
@@ -1394,6 +1409,7 @@ seedDailyPeriods();
 seedSettings();
 seedSchools();
 seedSecondaryTree();
+markSeededBranches();
 migrateAcademicYears();
 migrateAcademicYearTab();
 syncCertificateSubjects();

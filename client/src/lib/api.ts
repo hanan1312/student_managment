@@ -122,6 +122,13 @@ export const api = {
       token,
     }),
 
+  addBranchItem: (token: string, branchId: number, name: string, parentId?: number) =>
+    request<{ tree: any[]; flat: any[]; branches: import("./types").Branch[] }>(`/classes/branches/${branchId}/items`, {
+      method: "POST",
+      body: JSON.stringify({ name, parentId }),
+      token,
+    }),
+
   createClass: (token: string, levelId: number, name: string) =>
     request<{ tree: any[]; flat: any[] }>(`/classes/levels/${levelId}/classes`, {
       method: "POST",

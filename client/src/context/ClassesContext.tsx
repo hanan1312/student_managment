@@ -47,23 +47,24 @@ export function levelAndDescendants(levels: ClassLevel[], levelId: number): Clas
   return out;
 }
 
-// The name shown for a level in the tree: a شعبة reads as its section's name with its own in
-// quotes, e.g. الصف الثاني الثانوي "علمي".
-export function levelLabel(levels: ClassLevel[], level: ClassLevel): string {
-  if (!level.is_branch) return level.level;
-  const parent = levels.find((l) => l.id === level.parent_id);
-  return parent ? `${parent.level} "${level.level}"` : level.level;
+// The شعبة a student is on: the nearest شعبة among their section (المرحلة name + الصف path) and
+// the items above it, e.g. البكالوريا المصرية for الصف الثاني الثانوي / البكالوريا المصرية / الأعمال.
+export function branchOf(tree: ClassStage[], division: string | null, section: string | null): string {
+  const stage = tree.find((s) => s.stage === division);
+  let level = stage?.levels.find((l) => l.path === section);
+  while (level && stage) {
+    if (level.is_branch) return level.level;
+    const parentId: number | null = level.parent_id;
+    level = parentId === null ? undefined : stage.levels.find((l) => l.id === parentId);
+  }
+  return "";
 }
 
-// The items shown under parentId in the tree. A section whose sub-items are all شعب is shown as
-// its شعب instead (الصف الثاني الثانوي "علمي", الصف الثاني الثانوي "أدبي").
-export function visibleChildren(levels: ClassLevel[], parentId: number | null): ClassLevel[] {
-  return levels
-    .filter((l) => l.parent_id === parentId)
-    .flatMap((l) => {
-      const kids = levels.filter((c) => c.parent_id === l.id);
-      return kids.length > 0 && kids.every((c) => c.is_branch) ? kids : [l];
-    });
+// Levels a شعبة can be added to: any item that isn't a شعبة or inside one.
+export function branchTargets(levels: ClassLevel[]): ClassLevel[] {
+  const inBranch = new Set<number>();
+  for (const l of levels) if (l.is_branch || (l.parent_id !== null && inBranch.has(l.parent_id))) inBranch.add(l.id);
+  return levels.filter((l) => !inBranch.has(l.id));
 }
 
 // Every place a student can be placed: the leaves, labelled with their full path.

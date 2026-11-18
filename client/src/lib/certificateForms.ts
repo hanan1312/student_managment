@@ -83,17 +83,10 @@ const ORDER = {
   ],
 };
 
-// The شعبة in a student's الصف text: a شعبة added in Students > إضافة شعبة ends its section's path
-// with its name in quotes, e.g. الصف الثاني الثانوي "علمي" → علمي.
-export function branchName(section: string | null | undefined): string {
-  return /"([^"]+)"\s*$/.exec(section ?? "")?.[1]?.trim() ?? "";
-}
-
 // The form for a student, from their المرحلة and الصف (the section's path, e.g.
-// "الصف الثاني الثانوي / الثانوية العامة (نظام جديد) / شعبة علمي", or with a شعبة from
-// إضافة شعبة: الصف الثاني الثانوي "علمي", read as "الصف الثاني الثانوي / علمي").
-export function certificateFormFor(division: string | null, rawSection: string | null): CertificateForm {
-  const section = (rawSection ?? "").replace(/\s*"([^"]+)"/g, " / $1");
+// "الصف الثاني الثانوي / الثانوية العامة (نظام جديد) / شعبة علمي", or "الصف الثاني الثانوي / علمي"
+// for a شعبة علمي added in إضافة شعبة).
+export function certificateFormFor(division: string | null, section: string | null): CertificateForm {
   const stage = looseName(division);
   const path = (section ?? "").split("/").map(looseName).filter(Boolean);
   const grade = (section ?? "").split("/")[0]?.trim() ?? "";
@@ -103,10 +96,10 @@ export function certificateFormFor(division: string | null, rawSection: string |
       return { kind: "secondary", gradeLabel: grade, order: ORDER.sec1 };
     }
     const parts = (section ?? "").split("/").map((p) => p.trim()).filter(Boolean);
-    // الثانوية العامة's شعب, or a شعبة علمي / أدبي added straight to الصف الثاني الثانوي.
+    // الثانوية العامة's شعب, or a شعبة علمي / أدبي straight under الصف الثاني الثانوي.
     const amma =
       path[0] === looseName("الصف الثاني الثانوي") &&
-      (path.includes(looseName("الثانوية العامة (نظام جديد)")) || (path.length === 2 && Boolean(branchName(rawSection))));
+      (path.includes(looseName("الثانوية العامة (نظام جديد)")) || path.length === 2);
     const track = path[path.length - 1]?.replace(/^شعبه/, "");
     if (amma && track === looseName("علمي")) {
       return { kind: "secondary", gradeLabel: `${grade} (علمي)`, order: ORDER.sec2Science };

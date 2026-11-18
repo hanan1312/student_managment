@@ -3,7 +3,6 @@ import { useSchools } from "../context/SchoolsContext";
 import { useSettings } from "../context/SettingsContext";
 import { degreeTotals, formatDegree, formatPercentage, PASS_LABEL, passStatus, splitByOutside, statusTextClass } from "../lib/degrees";
 import {
-  branchName,
   certificateFormFor,
   FORM_FIELD_KINDS,
   FORM_SIGNATURES,
@@ -19,6 +18,7 @@ import { formatMoeCode } from "../lib/studentColumns";
 import type { StudentGrade } from "../lib/types";
 import { useUiControl } from "../lib/uiControl";
 import { useUserPlace } from "../lib/userPlace";
+import { branchOf, useClasses } from "../context/ClassesContext";
 import {
   LayoutOptions,
   OptionCheckbox,
@@ -168,9 +168,15 @@ function FormHeaderLines({ student, dept }: { student: CertificateStudent; dept:
   );
 }
 
-// الشعبة / <the student's شعبة> on the forms, when the student is on a شعبة (إضافة شعبة).
-function BranchLine({ section, className = "", inline = false }: { section: string | null; className?: string; inline?: boolean }) {
-  const branch = branchName(section);
+// The student's شعبة (إضافة شعبة), e.g. البكالوريا المصرية; empty when they aren't on one.
+function useStudentBranch(student: { division: string | null; section: string | null }): string {
+  const { tree } = useClasses();
+  return branchOf(tree, student.division, student.section);
+}
+
+// الشعبة / <the student's شعبة> on the forms, when the student is on a شعبة.
+function BranchLine({ student, className = "", inline = false }: { student: CertificateStudent; className?: string; inline?: boolean }) {
+  const branch = useStudentBranch(student);
   if (!branch) return inline ? null : <span />;
   const Tag = inline ? "span" : "p";
   return (
@@ -242,7 +248,7 @@ function SecondaryForm({
         <p>
           اسم الطالب / <span className="border-b border-dotted border-slate-500 px-2 font-bold">{student.name}</span>
         </p>
-        <BranchLine section={student.section} className="text-end" />
+        <BranchLine student={student} className="text-end" />
         <p>
           المدرسة / <span className="border-b border-dotted border-slate-500 px-2">{student.school || ""}</span>
         </p>
@@ -356,12 +362,8 @@ function PrepForm({
           </span>
           <span>
             الصف / <Field studentId={id} name="grade" fallback={form.gradeLabel} minChars={14} />
-            {branchName(student.section) && (
-              <>
-                {" "}
-                <BranchLine section={student.section} inline />
-              </>
-            )}
+            {" "}
+            <BranchLine student={student} inline />
           </span>
         </p>
         <p className="flex flex-wrap justify-between gap-x-6">
@@ -454,7 +456,7 @@ function Certificate({
 }) {
   const { settings } = useSettings();
   const { t } = useUiControl();
-  const branch = branchName(student.section);
+  const branch = useStudentBranch(student);
   const totals = degreeTotals(student.grades);
   const status = passStatus(totals.percentage);
   const cell = "border border-slate-400 px-1.5 py-1 text-center";

@@ -5,7 +5,7 @@ import path from "path";
 import "./db";
 import { authRouter } from "./routes/auth";
 import { studentsRouter } from "./routes/students";
-import { classesRouter } from "./routes/classes";
+import { classesRouter, syncStudentPositionText } from "./routes/classes";
 import { financeRouter } from "./routes/finance";
 import { timetableRouter } from "./routes/timetable";
 import { subjectsRouter } from "./routes/subjects";
@@ -66,6 +66,10 @@ app.use("/api/hr/payroll", hrPayrollRouter);
 app.use("/api/hr/org", hrOrgRouter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
+// Students' المرحلة / الصف text follows the tree (a شعبة added before this version was written
+// as الصف … "name"; it is الصف … / name now).
+syncStudentPositionText();
+
 app.listen(PORT, () => {
   console.log(`Edu-Hub API listening on http://localhost:${PORT}`);
 });

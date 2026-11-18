@@ -118,32 +118,40 @@ Opened from **إضافة مدرسة** on the Students ribbon. It lists the schoo
 
 ### الشعب (إضافة شعبة)
 
-Opened from **إضافة شعبة** on the Students ribbon. It lists every شعبة added by users, grouped by
-stage, as editable rows: **اسم الشعبة**, **المرحلة** and **الصف** (dropdowns of the stages and of the
-stage's sections in the الهيكل), and the number of students and subjects on it.
+Opened from **إضافة شعبة** on the Students ribbon. It lists every شعبة, grouped by stage, as
+editable rows: **اسم الشعبة**, **المرحلة** and **الصف** (dropdowns of the stages and of the stage's
+sections in the الهيكل), and the number of students and subjects on it. **البكالوريا المصرية** and
+**الثانوية العامة (نظام جديد)** (in الصف الثاني and الثالث الثانوي) are شعب too, and are listed and
+edited here like the ones users add.
 
 - **+ شعبة** adds a row: type the name, choose the المرحلة and the الصف it belongs to, then save.
 - Changing a row's name, المرحلة or الصف shows save / undo on that row. Moving a شعبة to another
-  الصف takes its students and subjects with it. 🗑 deletes it (its students are kept, without a
-  placement).
-- A الصف can have several شعب. In the الهيكل each one shows as the الصف's name with the شعبة's in
-  quotes. When every item under a الصف is a شعبة, the الصف is shown as its شعب:
+  الصف takes everything in it (sub-items, students, subjects) with it. 🗑 deletes it with everything
+  in it (the students are kept, without a placement).
+- **Sub-items (فروع):** the arrow beside a شعبة opens what's inside it, e.g. البكالوريا المصرية's
+  الطب وعلوم الحياة، الهندسة وعلوم الحاسب، الأعمال، الآداب والفنون, each with its students and
+  subjects. **+ فرع داخل …** adds one; each sub-item can be renamed, deleted, or get sub-items of
+  its own (+). A شعبة without sub-items has its students placed on it directly; once it has some,
+  students are placed on them.
+- In the الهيكل a شعبة is nested under its الصف with its own name, marked **شعبة**, the same way as
+  البكالوريا المصرية, and several شعب can share a الصف:
 
   ```
   المرحلة الثانوية
   ├ الصف الأول الثانوي
-  ├ الصف الثاني الثانوي "علمي"
-  └ الصف الثاني الثانوي "أدبي"
+  └ الصف الثاني الثانوي
+     ├ البكالوريا المصرية      شعبة
+     │  ├ الطب وعلوم الحياة
+     │  └ …
+     ├ علمي                     شعبة
+     └ أدبي                     شعبة
   ```
 
-  When the الصف has other items too (e.g. the seeded البكالوريا المصرية), the الصف stays and its
-  شعب are listed under it with those items.
-- A شعبة is a place students are placed on (التسكين), so their **الصف** reads e.g.
-  `الصف الثاني الثانوي "علمي"` in the table, prints and Export.
-- **Subjects:** a new شعبة starts with its الصف's subjects and marks from **المواد**; after that each
-  شعبة has its own, changed in المواد like any other section.
-- Not allowed: two items with the same name in one الصف, a شعبة inside a شعبة, or a شعبة on a الصف
-  that students are placed on directly (move them first).
+- **Subjects:** a new شعبة starts with its الصف's subjects and marks from **المواد**, and a new
+  sub-item with its parent's. After that each one has its own, changed in المواد like any other
+  section.
+- Not allowed: two items with the same name in one place, a شعبة anywhere inside another شعبة, or
+  adding inside an item that students are placed on directly (move them first).
 
 ### Students table
 
@@ -345,7 +353,8 @@ section's full path, as exported), النهاية الكبرى, النهاية �
 
 On the student's **ملف الدرجات** tab, or by clicking a student's row in the Degrees Profile screen:
 
-- A student on a شعبة sees it highlighted at the top: **شعبة : "علمي"**, with the full الصف.
+- A student on a شعبة (or one of its sub-items) sees it highlighted at the top: **شعبة : "علمي"**,
+  with the full الصف.
 
 - Each subject shows the section's **النهايات** (كبرى / صغرى, read-only) and **one degree** box
   (الدرجة), out of the كبرى mark. (The earlier separate صغرى degree is no longer entered or shown.)
@@ -454,10 +463,10 @@ form, laid out as the paper one:
   print **محافظة <the signed-in user's محافظة>** and **إدارة <the signed-in user's إدارة>
   التعليمية** (the إدارة of the student's school when the user has none). Before, a student whose
   school had no الإدارة printed nothing for a ticked الإدارة التعليمية; that was fixed.
-- **الشعبة:** a student on a شعبة gets "الشعبة / <name>" on the form (beside the name on the
-  secondary form, after الصف on the prep form), and the form's title names it, e.g. "الصف الثاني
-  الثانوي (علمي)". A شعبة named علمي or أدبي on الصف الثاني الثانوي gets the علمي / أدبي form's
-  subject order.
+- **الشعبة:** a student on a شعبة (or on one of its sub-items) gets "الشعبة / <name>" on the form
+  (beside the name on the secondary form, after الصف on the prep form), e.g. البكالوريا المصرية;
+  the form's title names the student's own item, e.g. "الصف الثاني الثانوي (علمي)". A شعبة named
+  علمي or أدبي directly under الصف الثاني الثانوي gets the علمي / أدبي form's subject order.
 - **The form's texts are student data:** البيانات الأساسية → **بيانات بيان النجاح** holds المحافظة,
   المديرية, الإدارة التعليمية, القسم (الثانوي / الإعدادي), عنوان الإعدادي, العام, لتقديمه إلى,
   الرسوم (ق / ج), رقم الحوالة, بتاريخ and تحريرا في for each student. الدور is chosen in the
@@ -616,7 +625,7 @@ except the two clean-ups noted at the end of this section.
 |---|---|
 | Students | New: المدرسة, التسكين (section link, filled in from each student's old class), الديانة uses the existing field |
 | Hierarchy | Sections can nest. المرحلة الثانوية tree added once |
-| Hierarchy — شعب | New `levels.is_branch` (0/1): a level added in إضافة شعبة. Its path is its section's with the name in quotes |
+| Hierarchy — شعب | New `levels.is_branch` (0/1): a شعبة. Set once on the seeded البكالوريا المصرية and الثانوية العامة (نظام جديد) (flag `marked_seeded_branches_v1`). Students' المرحلة / الصف text is recomputed at every start-up |
 | Subjects | كبرى/صغرى, خارج المجموع and اختياري are stored per section. The old subject-wide marks were copied to each of the subject's sections |
 | Degrees | New per-student degrees table: كبرى degree, صغرى degree, and the frozen marks |
 | Users | New: code, city, education administration, "must change password". New cities and education-administrations tables. New sign-in lockout table |
@@ -686,7 +695,7 @@ Clean-ups:
 | File | Purpose |
 |---|---|
 | `server/src/db.ts` | Migrations: `migrateSubjectsColumns`, `migrateUsersColumns`, `migrateLevelsColumns`; `seedSecondaryTree` (runs once, guarded by the settings flag `seeded_secondary_tree_v1`) |
-| `server/src/routes/classes.ts` | Nested tree response (flat list with `parent_id`, `depth`, `path`, `is_leaf`, `is_branch`); `syncStudentPositionText`; deleting a branch; drag moves (`PUT /stages/:id/position`, `PUT /levels/:id/position`, `moveLevelTo`); الشعب (`GET`/`POST /branches`, `PUT /branches/:id`; delete is `DELETE /levels/:id`) |
+| `server/src/routes/classes.ts` | Nested tree response (flat list with `parent_id`, `depth`, `path`, `is_leaf`, `is_branch`); `syncStudentPositionText`; deleting a branch; drag moves (`PUT /stages/:id/position`, `PUT /levels/:id/position`, `moveLevelTo`); الشعب (`GET`/`POST /branches`, `PUT /branches/:id`, sub-items `POST /branches/:id/items`; rename / delete through `/levels/:id`) |
 | `server/src/routes/students.ts` | Position must be a leaf; `studentGrades`; `/degrees-overview`; saving grades with frozen marks; `degreeSummary` (totals and percentage, same rule as the client); stage scope checks |
 | `server/src/routes/subjects.ts` | Per-section `levelMarks` (كبرى/صغرى, `outsideTotal`). `elective_group` is preserved. Open to the `timetable` **or** `students` permission |
 | `server/src/routes/users.ts` | Generated code, username and password; edit with optional reset; `must_change_password` |
@@ -709,7 +718,7 @@ Clean-ups:
 | `client/src/components/StudentDegreesEditor.tsx` | Shared per-student degrees editor |
 | `client/src/components/DegreesProfileModal.tsx` | Degrees Profile screen |
 | `client/src/components/StudentCertificateModal.tsx` | Certificate print preview: the official forms (`SecondaryForm`, `PrepForm`, editable `Field`s) and the app's certificate |
-| `client/src/lib/certificateForms.ts` | Which form a student gets (`certificateFormFor`), the forms' subject order and signatures; `branchName` (the شعبة in a الصف text) |
+| `client/src/lib/certificateForms.ts` | Which form a student gets (`certificateFormFor`), the forms' subject order and signatures |
 | `client/src/pages/AcademicYearsPage.tsx` | العام الدراسي cards |
 | `client/src/components/StudentsTable.tsx` | Students table; 50-per-page paging (`PAGE_SIZE`), reset by the page's `pageResetKey` |
 | `client/src/components/StudentsPrintModal.tsx` | Students print preview (divisions, columns, layout); print CSS in `index.css` (`.print-modal-root`, `.print-sheet`) |
@@ -721,7 +730,7 @@ Clean-ups:
 | `client/src/lib/studentAge.ts` | Age on 1 October |
 | `client/src/lib/useColumnOrder.ts` | Drag-to-reorder table columns (`useColumnOrder`, `orderedCells`); saved in `localStorage` as `column_order:<table>`; drag styles in `index.css` |
 | `client/src/components/ClassTree.tsx` | Nested tree; drag mode (`ArrangeContext`, `useArrangeRow`) |
-| `client/src/context/ClassesContext.tsx` | Selection by `levelId`, `levelAndDescendants`, `positionOptions`; شعبة labels and the الصف-shown-as-its-شعب rule (`levelLabel`, `visibleChildren`) |
+| `client/src/context/ClassesContext.tsx` | Selection by `levelId`, `levelAndDescendants`, `positionOptions`; a student's شعبة (`branchOf`), where a شعبة may go (`branchTargets`) |
 | `client/src/components/BranchesModal.tsx` | إضافة شعبة |
 | `client/src/lib/userPlace.ts` | `useUserPlace()`: the signed-in user's محافظة and إدارة تعليمية (home page, print headers, official forms) |
 | `client/src/components/timetable/SubjectSetupModal.tsx` | Per-section marks, خارج, اختياري badge |

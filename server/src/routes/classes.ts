@@ -22,17 +22,11 @@ type LevelRow = {
 
 export const PATH_SEPARATOR = " / ";
 
-// A شعبة's path joins its section's with the name in quotes, e.g. الصف الثاني الثانوي "علمي".
-function joinPath(prefix: string, level: LevelRow): string {
-  if (!prefix) return level.name;
-  return level.is_branch ? `${prefix} "${level.name}"` : `${prefix}${PATH_SEPARATOR}${level.name}`;
-}
-
 function orderedLevels(levels: LevelRow[]) {
   const out: (LevelRow & { depth: number; path: string; is_leaf: boolean })[] = [];
   const walk = (parentId: number | null, depth: number, prefix: string) => {
     for (const level of levels.filter((l) => l.parent_id === parentId)) {
-      const path = joinPath(prefix, level);
+      const path = prefix ? `${prefix}${PATH_SEPARATOR}${level.name}` : level.name;
       const is_leaf = !levels.some((l) => l.parent_id === level.id);
       out.push({ ...level, depth, path, is_leaf });
       walk(level.id, depth + 1, path);
@@ -358,8 +352,11 @@ classesRouter.put("/levels/:levelId/position", requireAuth, (req, res) => {
 });
 
 // Students > إضافة شعبة: the شعب (levels with is_branch) and where each one is (its stage and
-// section). A شعبة is a level like any other: students are placed on it and it has its own
-// subjects in المواد.
+// section). A شعبة is a level like any other, shown nested under its section (like البكالوريا
+// المصرية under الصف الثاني الثانوي). Students are placed on it, or on its sub-items (e.g. its
+// tracks) when it has some, and each has its own subjects in المواد.
+type BranchItem = { id: number; name: string; parent_id: number; depth: number; path: string; students: number; subjects: number };
+
 type BranchRow = {
   id: number;
   name: string;
@@ -370,6 +367,8 @@ type BranchRow = {
   path: string;
   students: number;
   subjects: number;
+  // Everything under the شعبة, in tree order; depth 1 = directly under it.
+  items: BranchItem[];
 };
 
 function listBranches(req: AuthedRequest): BranchRow[] {
@@ -398,6 +397,17 @@ function listBranches(req: AuthedRequest): BranchRow[] {
     for (const level of ordered) {
       if (!level.is_branch) continue;
       const parent = ordered.find((l) => l.id === level.parent_id);
+      const items = ordered
+        .filter((l) => l.path.startsWith(`${level.path}${PATH_SEPARATOR}`))
+        .map((l) => ({
+          id: l.id,
+          name: l.name,
+          parent_id: l.parent_id as number,
+          depth: l.depth - level.depth,
+          path: l.path.slice(level.path.length + PATH_SEPARATOR.length),
+          students: students.get(l.id) ?? 0,
+          subjects: subjects.get(l.id) ?? 0,
+        }));
       out.push({
         id: level.id,
         name: level.name,
@@ -408,6 +418,7 @@ function listBranches(req: AuthedRequest): BranchRow[] {
         path: level.path,
         students: students.get(level.id) ?? 0,
         subjects: subjects.get(level.id) ?? 0,
+        items,
       });
     }
   }
@@ -418,6 +429,28 @@ const branchResponse = (req: AuthedRequest) => ({ ...buildTreeResponse(req), bra
 
 // A شعبة's name must be new among its section's items (ا / أ / إ written either way).
 const looseKey = (text: string) => text.replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, "");
+
+// A شعبة can't be anywhere inside another شعبة (its sub-items are tracks, not شعب).
+function insideBranch(levelId: number): boolean {
+  let id: number | null = levelId;
+  while (id !== null) {
+    const row = db.prepare("SELECT parent_id, is_branch FROM levels WHERE id = ?").get(id) as
+      | { parent_id: number | null; is_branch: number }
+      | undefined;
+    if (!row) return false;
+    if (row.is_branch) return true;
+    id = row.parent_id;
+  }
+  return false;
+}
+
+// Copies a level's subjects and marks (المواد) to a new level under it.
+function copySubjects(fromLevelId: number, toLevelId: number) {
+  db.prepare(
+    `INSERT OR IGNORE INTO subject_levels (subject_id, level_id, max_degree, min_degree, outside_total, elective_group)
+     SELECT subject_id, ?, max_degree, min_degree, outside_total, elective_group FROM subject_levels WHERE level_id = ?`
+  ).run(toLevelId, fromLevelId);
+}
 
 function nameTaken(stageId: number, parentId: number | null, name: string, exceptId: number | null): boolean {
   const rows = db
@@ -438,11 +471,9 @@ classesRouter.post("/branches", requireAuth, (req, res) => {
   if (parentId === null) return res.status(400).json({ error: "اختر الصف الذي تتبعه الشعبة" });
   if (!stageAllowed(req, stageId)) return res.status(403).json({ error: OUT_OF_SCOPE_ERROR });
 
-  const parent = db.prepare("SELECT id, is_branch FROM levels WHERE id = ? AND stage_id = ?").get(parentId, stageId) as
-    | { id: number; is_branch: number }
-    | undefined;
+  const parent = db.prepare("SELECT id FROM levels WHERE id = ? AND stage_id = ?").get(parentId, stageId);
   if (!parent) return res.status(404).json({ error: "الصف غير موجود في هذه المرحلة" });
-  if (parent.is_branch) return res.status(400).json({ error: "لا يمكن إضافة شعبة داخل شعبة" });
+  if (insideBranch(parentId)) return res.status(400).json({ error: "لا يمكن إضافة شعبة داخل شعبة" });
   if (db.prepare("SELECT 1 FROM students WHERE level_id = ?").get(parentId)) {
     return res.status(400).json({ error: "يوجد طلاب مسكنون على هذا الصف مباشرة؛ انقلهم أولاً قبل إضافة شعبة له" });
   }
@@ -459,10 +490,41 @@ classesRouter.post("/branches", requireAuth, (req, res) => {
         .run(stageId, name, maxOrder + 1, parentId).lastInsertRowid
     );
     // The new شعبة starts with its section's subjects and marks (المواد), to be changed there.
-    db.prepare(
-      `INSERT OR IGNORE INTO subject_levels (subject_id, level_id, max_degree, min_degree, outside_total, elective_group)
-       SELECT subject_id, ?, max_degree, min_degree, outside_total, elective_group FROM subject_levels WHERE level_id = ?`
-    ).run(id, parentId);
+    copySubjects(parentId, id);
+  })();
+
+  res.status(201).json(branchResponse(req));
+});
+
+// Adds a sub-item (e.g. a track) under a شعبة or under one of its sub-items (parentId). It starts
+// with its parent's subjects and marks.
+classesRouter.post("/branches/:id/items", requireAuth, (req, res) => {
+  const branchId = Number(req.params.id);
+  const name = String(req.body?.name ?? "").trim();
+  const parentId = req.body?.parentId ? Number(req.body.parentId) : branchId;
+  if (!name) return res.status(400).json({ error: "الاسم مطلوب" });
+  const branch = db.prepare("SELECT id, stage_id FROM levels WHERE id = ? AND is_branch = 1").get(branchId) as
+    | { id: number; stage_id: number }
+    | undefined;
+  if (!branch) return res.status(404).json({ error: "الشعبة غير موجودة" });
+  if (!levelAllowed(req, branchId)) return res.status(403).json({ error: OUT_OF_SCOPE_ERROR });
+  if (parentId !== branchId && !descendantLevelIds(branchId).includes(parentId)) {
+    return res.status(400).json({ error: "العنصر ليس داخل هذه الشعبة" });
+  }
+  if (db.prepare("SELECT 1 FROM students WHERE level_id = ?").get(parentId)) {
+    return res.status(400).json({ error: "يوجد طلاب مسكنون عليه مباشرة؛ انقلهم أولاً قبل إضافة فروع داخله" });
+  }
+  if (nameTaken(branch.stage_id, parentId, name, null)) return res.status(400).json({ error: "يوجد فرع بنفس الاسم هنا" });
+
+  const maxOrder =
+    (db.prepare("SELECT MAX(sort_order) as m FROM levels WHERE parent_id = ?").get(parentId) as { m: number | null }).m ?? -1;
+  db.transaction(() => {
+    const id = Number(
+      db
+        .prepare("INSERT INTO levels (stage_id, name, sort_order, parent_id) VALUES (?, ?, ?, ?)")
+        .run(branch.stage_id, name, maxOrder + 1, parentId).lastInsertRowid
+    );
+    copySubjects(parentId, id);
   })();
 
   res.status(201).json(branchResponse(req));
@@ -482,11 +544,9 @@ classesRouter.put("/branches/:id", requireAuth, (req, res) => {
     | undefined;
   if (!branch) return res.status(404).json({ error: "الشعبة غير موجودة" });
   if (!levelAllowed(req, id) || !stageAllowed(req, stageId)) return res.status(403).json({ error: OUT_OF_SCOPE_ERROR });
-  const parent = db.prepare("SELECT is_branch FROM levels WHERE id = ? AND stage_id = ?").get(parentId, stageId) as
-    | { is_branch: number }
-    | undefined;
+  const parent = db.prepare("SELECT id FROM levels WHERE id = ? AND stage_id = ?").get(parentId, stageId);
   if (!parent) return res.status(404).json({ error: "الصف غير موجود في هذه المرحلة" });
-  if (parent.is_branch) return res.status(400).json({ error: "لا يمكن وضع شعبة داخل شعبة" });
+  if (insideBranch(parentId)) return res.status(400).json({ error: "لا يمكن وضع شعبة داخل شعبة" });
   if (nameTaken(stageId, parentId, name, id)) return res.status(400).json({ error: "توجد شعبة أو فرع بنفس الاسم في هذا الصف" });
 
   if (branch.stage_id !== stageId || branch.parent_id !== parentId) {

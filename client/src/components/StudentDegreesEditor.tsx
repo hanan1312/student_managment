@@ -4,7 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { degreeTotals, formatDegree, formatPercentage, passStatus, roundDegree, statusBadgeClass } from "../lib/degrees";
 import type { StudentGrade } from "../lib/types";
-import { branchName, EXAM_ROUNDS, parseFormFields, studentRound } from "../lib/certificateForms";
+import { EXAM_ROUNDS, parseFormFields, studentRound } from "../lib/certificateForms";
+import { branchOf, useClasses } from "../context/ClassesContext";
 import { inputCls } from "./FormLayout";
 import StudentCertificateModal, { type CertificateStudent } from "./StudentCertificateModal";
 
@@ -95,8 +96,9 @@ export default function StudentDegreesEditor({
   };
 
   const cellCls = "px-4 py-2 text-center text-slate-600";
-  // The student's شعبة (Students > إضافة شعبة), from their الصف, e.g. الصف الثاني الثانوي "علمي".
-  const branch = branchName(student.section);
+  // The student's شعبة (Students > إضافة شعبة), e.g. البكالوريا المصرية.
+  const { tree } = useClasses();
+  const branch = branchOf(tree, student.division, student.section);
 
   return (
     <div className="space-y-4">
