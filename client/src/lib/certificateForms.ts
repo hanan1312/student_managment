@@ -83,9 +83,17 @@ const ORDER = {
   ],
 };
 
+// The شعبة in a student's الصف text: a شعبة added in Students > إضافة شعبة ends its section's path
+// with its name in quotes, e.g. الصف الثاني الثانوي "علمي" → علمي.
+export function branchName(section: string | null | undefined): string {
+  return /"([^"]+)"\s*$/.exec(section ?? "")?.[1]?.trim() ?? "";
+}
+
 // The form for a student, from their المرحلة and الصف (the section's path, e.g.
-// "الصف الثاني الثانوي / الثانوية العامة (نظام جديد) / شعبة علمي").
-export function certificateFormFor(division: string | null, section: string | null): CertificateForm {
+// "الصف الثاني الثانوي / الثانوية العامة (نظام جديد) / شعبة علمي", or with a شعبة from
+// إضافة شعبة: الصف الثاني الثانوي "علمي", read as "الصف الثاني الثانوي / علمي").
+export function certificateFormFor(division: string | null, rawSection: string | null): CertificateForm {
+  const section = (rawSection ?? "").replace(/\s*"([^"]+)"/g, " / $1");
   const stage = looseName(division);
   const path = (section ?? "").split("/").map(looseName).filter(Boolean);
   const grade = (section ?? "").split("/")[0]?.trim() ?? "";
@@ -95,12 +103,15 @@ export function certificateFormFor(division: string | null, section: string | nu
       return { kind: "secondary", gradeLabel: grade, order: ORDER.sec1 };
     }
     const parts = (section ?? "").split("/").map((p) => p.trim()).filter(Boolean);
-    const amma = path[0] === looseName("الصف الثاني الثانوي") && path.includes(looseName("الثانوية العامة (نظام جديد)"));
-    const track = path[path.length - 1];
-    if (amma && track === looseName("شعبة علمي")) {
+    // الثانوية العامة's شعب, or a شعبة علمي / أدبي added straight to الصف الثاني الثانوي.
+    const amma =
+      path[0] === looseName("الصف الثاني الثانوي") &&
+      (path.includes(looseName("الثانوية العامة (نظام جديد)")) || (path.length === 2 && Boolean(branchName(rawSection))));
+    const track = path[path.length - 1]?.replace(/^شعبه/, "");
+    if (amma && track === looseName("علمي")) {
       return { kind: "secondary", gradeLabel: `${grade} (علمي)`, order: ORDER.sec2Science };
     }
-    if (amma && track === looseName("شعبة أدبي")) {
+    if (amma && track === looseName("أدبي")) {
       return { kind: "secondary", gradeLabel: `${grade} (أدبي)`, order: ORDER.sec2Literary };
     }
     // Every other section of the stage (البكالوريا المصرية's tracks, الصف الثالث الثانوي, …) uses the

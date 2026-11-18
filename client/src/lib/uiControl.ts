@@ -56,11 +56,11 @@ type TextDef = { group: (typeof TEXT_GROUPS)[number]["key"]; label: string; defa
 
 // Every text التحكم can change. The tab names are edited with the tabs themselves.
 export const TEXTS = {
-  // {الإدارة} and {المدينة} are the signed-in user's إدارة تعليمية and مدينة (see welcomeText).
+  // {الإدارة} and {المحافظة} are the signed-in user's إدارة تعليمية and محافظة (see welcomeText).
   "home.welcome": {
     group: "home",
     label: "نص الترحيب",
-    default: "أهلًا وسهلًا بكم في إدارة {الإدارة} بمدينة {المدينة}",
+    default: "أهلًا وسهلًا بكم في إدارة {الإدارة} بمحافظة {المحافظة}",
   },
   "section.studentsAffair": { group: "sections", label: "قسم شئون الطلاب", default: "شئون الطلاب" },
   "section.hrStaff": { group: "sections", label: "قسم شئون العاملين", default: "شئون العاملين" },
@@ -72,9 +72,10 @@ export const TEXTS = {
   "ribbon.subjects": { group: "ribbon", label: "زر المواد", default: "المواد" },
   "ribbon.degrees": { group: "ribbon", label: "زر ملف الدرجات", default: "ملف الدرجات" },
   "ribbon.schools": { group: "ribbon", label: "زر إضافة مدرسة", default: "إضافة مدرسة" },
+  "ribbon.branches": { group: "ribbon", label: "زر إضافة شعبة", default: "إضافة شعبة" },
   "print.certificateTitle": { group: "print", label: "عنوان شهادة الطالب", default: "بيان نجاح طالب" },
-  "print.directorate": { group: "print", label: "السطر الأول في رأس الشهادة", default: "مديرية التربية و التعليم" },
-  "print.adminPrefix": { group: "print", label: "قبل اسم الإدارة في رأس الشهادة", default: "إدارة" },
+  "print.directorate": { group: "print", label: "سطر المديرية في رأس الشهادة", default: "مديرية التربية و التعليم" },
+  "print.adminPrefix": { group: "print", label: "قبل اسم الإدارة في النموذج الرسمي", default: "إدارة" },
   "print.studentsTitle": { group: "print", label: "عنوان كشف بيانات الطلاب", default: "كشف بيانات الطلاب" },
   "print.degreesTitle": { group: "print", label: "عنوان كشف الدرجات", default: "كشف درجات الطلاب" },
   "print.printedAt": { group: "print", label: "تاريخ الطباعة", default: "تاريخ الطباعة" },
@@ -84,28 +85,29 @@ export const TEXTS = {
 
 export type TextKey = keyof typeof TEXTS;
 
-// The welcome text with {الإدارة} and {المدينة} filled in. The name of the إدارة is used without
+// The welcome text with {الإدارة} and {المحافظة} filled in ({المدينة}, the earlier name, still
+// works in texts saved before the rename). The name of the إدارة is used without
 // a leading "إدارة", since the text says it (e.g. "إدارة جنوب" → "في إدارة جنوب").
 // welcomeSegments keeps the filled-in parts apart (highlight), for the home page to show them
 // in gold.
 export function welcomeSegments(
   template: string,
-  place: { admin: string; city: string }
+  place: { admin: string; governorate: string }
 ): { text: string; highlight: boolean }[] {
   const admin = place.admin.trim().replace(/^[اإأ]دار[ةه]\s+/, "");
   return template
-    .split(/(\{\s*(?:ال[اإأ]دار[ةه]|المدين[ةه])\s*\})/)
+    .split(/(\{\s*(?:ال[اإأ]دار[ةه]|المدين[ةه]|المحافظ[ةه])\s*\})/)
     .map((part) =>
       /^\{\s*ال[اإأ]دار[ةه]\s*\}$/.test(part)
         ? { text: admin, highlight: true }
-        : /^\{\s*المدين[ةه]\s*\}$/.test(part)
-          ? { text: place.city.trim(), highlight: true }
+        : /^\{\s*(?:المدين[ةه]|المحافظ[ةه])\s*\}$/.test(part)
+          ? { text: place.governorate.trim(), highlight: true }
           : { text: part, highlight: false }
     )
     .filter((s) => s.text);
 }
 
-export function welcomeText(template: string, place: { admin: string; city: string }): string {
+export function welcomeText(template: string, place: { admin: string; governorate: string }): string {
   return welcomeSegments(template, place)
     .map((s) => s.text)
     .join("")

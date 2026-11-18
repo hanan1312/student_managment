@@ -185,7 +185,7 @@ authRouter.post("/logout", requireAuth, (req: AuthedRequest, res) => {
   res.status(204).send();
 });
 
-// The user's مدينة and إدارة تعليمية (المستخدمين), for the home page's welcome text.
+// The user's محافظة and إدارة تعليمية (المستخدمين), for the home page's welcome text and printouts.
 function userPlace(userId: number): { city_name: string | null; education_admin_name: string | null } {
   const row = db
     .prepare(

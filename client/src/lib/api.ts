@@ -106,6 +106,22 @@ export const api = {
       token,
     }),
 
+  getBranches: (token: string) => request<{ branches: import("./types").Branch[] }>("/classes/branches", { token }),
+
+  createBranch: (token: string, input: { name: string; stageId: number; parentId: number }) =>
+    request<{ tree: any[]; flat: any[]; branches: import("./types").Branch[] }>("/classes/branches", {
+      method: "POST",
+      body: JSON.stringify(input),
+      token,
+    }),
+
+  updateBranch: (token: string, id: number, input: { name: string; stageId: number; parentId: number }) =>
+    request<{ tree: any[]; flat: any[]; branches: import("./types").Branch[] }>(`/classes/branches/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+      token,
+    }),
+
   createClass: (token: string, levelId: number, name: string) =>
     request<{ tree: any[]; flat: any[] }>(`/classes/levels/${levelId}/classes`, {
       method: "POST",

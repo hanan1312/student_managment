@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   BookMarked,
   Building2,
+  GitBranch,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useClasses, type ClassSelection } from "../context/ClassesContext";
@@ -53,6 +54,7 @@ import StudentCertificateModal, { type CertificateStudent } from "../components/
 import CsvImportModal, { type ImportColumn, type MappedRow } from "../components/CsvImportModal";
 import RibbonGroup from "../components/RibbonGroup";
 import SchoolFormModal from "../components/SchoolFormModal";
+import BranchesModal from "../components/BranchesModal";
 
 type FlatClass = { id: number; className: string; stage: string; level: string };
 
@@ -326,6 +328,7 @@ export default function StudentsPage() {
   const [degreesOpen, setDegreesOpen] = useState(false);
   const [subjectsOpen, setSubjectsOpen] = useState(false);
   const [schoolsOpen, setSchoolsOpen] = useState(false);
+  const [branchesOpen, setBranchesOpen] = useState(false);
   const { tree, selection, setSelection, selectedClassIds, selectedLevelIds, selectedClassId } = useClasses();
   const scopeName = selectionLabel(tree, selection);
 
@@ -758,6 +761,7 @@ export default function StudentsPage() {
                 { key: "ribbon.subjects", icon: BookMarked, onClick: () => setSubjectsOpen(true) },
                 { key: "ribbon.degrees", icon: GraduationCap, onClick: () => setDegreesOpen(true) },
                 { key: "ribbon.schools", icon: Building2, onClick: () => setSchoolsOpen(true) },
+                { key: "ribbon.branches", icon: GitBranch, onClick: () => setBranchesOpen(true) },
               ] as const
             )
               .filter((b) => ui.isButtonVisible(b.key))
@@ -858,6 +862,16 @@ export default function StudentsPage() {
           onClose={() => {
             setSchoolsOpen(false);
             // A renamed school renames the students' المدرسة too.
+            loadStudents();
+          }}
+        />
+      )}
+
+      {branchesOpen && (
+        <BranchesModal
+          onClose={() => {
+            setBranchesOpen(false);
+            // Moving or renaming a شعبة changes its students' الصف text.
             loadStudents();
           }}
         />

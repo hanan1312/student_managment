@@ -1,7 +1,7 @@
 import { useOutletContext } from "react-router-dom";
 import { ArrowLeft, Briefcase, CalendarDays, GraduationCap, type LucideIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useSchools } from "../context/SchoolsContext";
+import { useUserPlace } from "../lib/userPlace";
 import { useSettings } from "../context/SettingsContext";
 import { assetUrl } from "../lib/api";
 import { useUiControl, welcomeSegments } from "../lib/uiControl";
@@ -16,27 +16,18 @@ const SECTION_LOOK: Record<SectionKey, { icon: LucideIcon; caption: string }> = 
 // Delay between the welcome text's words, and when the cards start rising after it.
 const WORD_STEP_MS = 110;
 
-// The one value every school has, if they all share it (e.g. one إدارة for the whole app).
-function shared(values: (string | null)[]): string {
-  const set = new Set(values.filter((v): v is string => Boolean(v?.trim())));
-  return set.size === 1 ? [...set][0] : "";
-}
 
 // The page shown after signing in: a banner with the welcome text set in التحكم (the user's
-// إدارة and مدينة filled in, shown word by word) and a card per section (شئون الطلاب, …).
+// إدارة and محافظة filled in, shown word by word) and a card per section (شئون الطلاب, …).
 export default function HomePage() {
   const { user } = useAuth();
-  const { schools } = useSchools();
   const { settings } = useSettings();
   const ui = useUiControl();
   const { sections, goToSection } = useOutletContext<LayoutContext>();
 
   // The user's own (المستخدمين); an account without them (e.g. the admin) takes the schools'.
-  const place = {
-    admin: user?.education_admin_name || shared(schools.map((s) => s.education_admin_name)),
-    city: user?.city_name || shared(schools.map((s) => s.city_name)),
-  };
-  // Words in order, each knowing whether it came from {الإدارة} / {المدينة}.
+  const place = useUserPlace();
+  // Words in order, each knowing whether it came from {الإدارة} / {المحافظة}.
   const words = welcomeSegments(ui.t("home.welcome"), place).flatMap((seg) =>
     seg.text
       .split(/\s+/)

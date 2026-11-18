@@ -47,7 +47,22 @@ export type ClassLevel = {
   depth: number;
   path: string;
   is_leaf: boolean;
+  // A شعبة added in Students > إضافة شعبة; its path reads e.g. الصف الثاني الثانوي "علمي".
+  is_branch: boolean;
   classes: ClassLeaf[];
+};
+
+// A row of Students > إضافة شعبة: the شعبة, its stage and the section it belongs to.
+export type Branch = {
+  id: number;
+  name: string;
+  stage_id: number;
+  stage: string;
+  parent_id: number | null;
+  section: string;
+  path: string;
+  students: number;
+  subjects: number;
 };
 
 export type ClassStage = {

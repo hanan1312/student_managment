@@ -32,7 +32,7 @@ type UsersTab = "users" | "activity" | "cities" | "education-admins";
 const TAB_BUTTONS: { key: UsersTab; label: string; icon: typeof ShieldCheck }[] = [
   { key: "users", label: "المستخدمين", icon: ShieldCheck },
   { key: "activity", label: "النشاط", icon: Activity },
-  { key: "cities", label: "مدينة", icon: MapPin },
+  { key: "cities", label: "محافظة", icon: MapPin },
   { key: "education-admins", label: "إدارة تعليمية", icon: Landmark },
 ];
 
@@ -43,7 +43,7 @@ const USER_COLUMN_LABELS = {
   code: "الكود",
   full_name: "الاسم بالكامل",
   role: "الدور",
-  city: "مدينة",
+  city: "محافظة",
   education_admin: "إدارة تعليمية",
   password: "كلمة المرور",
 };

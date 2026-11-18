@@ -8,10 +8,10 @@ import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
 
 const CATALOG_COLUMN_KEYS = ["code", "name", "comment"] as const;
 
-// Users > مدينة / إدارة تعليمية: a table of entries plus an "add new" row. The two catalogs
+// Users > محافظة / إدارة تعليمية: a table of entries plus an "add new" row. The two catalogs
 // only differ in what their code column is called.
 const LABELS: Record<UserCatalogKind, { code: string; title: string }> = {
-  cities: { code: "الرقم البريدي", title: "مدينة" },
+  cities: { code: "الرقم البريدي", title: "محافظة" },
   "education-admins": { code: "الكود", title: "إدارة تعليمية" },
 };
 

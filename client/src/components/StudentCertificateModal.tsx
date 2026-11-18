@@ -3,6 +3,7 @@ import { useSchools } from "../context/SchoolsContext";
 import { useSettings } from "../context/SettingsContext";
 import { degreeTotals, formatDegree, formatPercentage, PASS_LABEL, passStatus, splitByOutside, statusTextClass } from "../lib/degrees";
 import {
+  branchName,
   certificateFormFor,
   FORM_FIELD_KINDS,
   FORM_SIGNATURES,
@@ -17,6 +18,7 @@ import { useSignatures, type Signatures } from "../lib/print";
 import { formatMoeCode } from "../lib/studentColumns";
 import type { StudentGrade } from "../lib/types";
 import { useUiControl } from "../lib/uiControl";
+import { useUserPlace } from "../lib/userPlace";
 import {
   LayoutOptions,
   OptionCheckbox,
@@ -59,13 +61,15 @@ type CertColumn = { kind: "subject"; grade: StudentGrade } | { kind: "total" };
 // إدارة and ادارة (and أ / آ) are the same word as typed by different people.
 const normalizeAlef = (text: string) => text.replace(/[أإآ]/g, "ا").trim();
 
-// "إدارة <the administration of the student's school>" (إضافة مدرسة → الإدارة); the word isn't
-// printed twice when the name already starts with it.
+// "إدارة <the education administration>": the signed-in user's (المستخدمين), or else the one of
+// the student's school (إضافة مدرسة → الإدارة); the word isn't printed twice when the name
+// already starts with it.
 function useAdminLine(schoolName: string | null): string {
   const { schools } = useSchools();
   const { t } = useUiControl();
+  const place = useUserPlace();
   const school = schools.find((s) => s.name.trim() === schoolName?.trim());
-  const adminName = school?.education_admin_name?.trim() || school?.directorate?.trim() || "";
+  const adminName = place.admin || school?.education_admin_name?.trim() || school?.directorate?.trim() || "";
   const adminPrefix = t("print.adminPrefix");
   return adminName && !normalizeAlef(adminName).startsWith(normalizeAlef(adminPrefix)) ? `${adminPrefix} ${adminName}` : adminName;
 }
@@ -135,16 +139,24 @@ function Field({
   );
 }
 
-// The four header lines at the top right of both official forms.
+// The four header lines at the top right of both official forms. المحافظة and الإدارة التعليمية
+// default to the signed-in user's (المستخدمين) when the student has no text of their own.
 function FormHeaderLines({ student, dept }: { student: CertificateStudent; dept: "dept_secondary" | "dept_prep" }) {
   const { t } = useUiControl();
+  const { governorate } = useUserPlace();
   const adminLine = useAdminLine(student.school);
   const line = "text-start !font-bold";
   return (
     <div className="flex flex-col items-start gap-0.5 text-[1.05em]">
-      <Field studentId={student.id} name="gov" fallback="محافظة " minChars={14} className={line} />
+      <Field studentId={student.id} name="gov" fallback={`محافظة ${governorate}`.trim()} minChars={14} className={line} />
       <Field studentId={student.id} name="directorate" fallback={t("print.directorate")} minChars={14} className={line} />
-      <Field studentId={student.id} name="admin" fallback={adminLine ? `${adminLine} التعليمية` : ""} minChars={14} className={line} />
+      <Field
+        studentId={student.id}
+        name="admin"
+        fallback={adminLine ? (/التعليمي[ةه]\s*$/.test(adminLine) ? adminLine : `${adminLine} التعليمية`) : "الإدارة التعليمية"}
+        minChars={14}
+        className={line}
+      />
       <Field
         studentId={student.id}
         name={dept}
@@ -153,6 +165,18 @@ function FormHeaderLines({ student, dept }: { student: CertificateStudent; dept:
         className={line}
       />
     </div>
+  );
+}
+
+// الشعبة / <the student's شعبة> on the forms, when the student is on a شعبة (إضافة شعبة).
+function BranchLine({ section, className = "", inline = false }: { section: string | null; className?: string; inline?: boolean }) {
+  const branch = branchName(section);
+  if (!branch) return inline ? null : <span />;
+  const Tag = inline ? "span" : "p";
+  return (
+    <Tag className={className}>
+      الشعبة / <span className="border-b border-dotted border-slate-500 px-2 font-bold">{branch}</span>
+    </Tag>
   );
 }
 
@@ -218,7 +242,7 @@ function SecondaryForm({
         <p>
           اسم الطالب / <span className="border-b border-dotted border-slate-500 px-2 font-bold">{student.name}</span>
         </p>
-        <span />
+        <BranchLine section={student.section} className="text-end" />
         <p>
           المدرسة / <span className="border-b border-dotted border-slate-500 px-2">{student.school || ""}</span>
         </p>
@@ -332,6 +356,12 @@ function PrepForm({
           </span>
           <span>
             الصف / <Field studentId={id} name="grade" fallback={form.gradeLabel} minChars={14} />
+            {branchName(student.section) && (
+              <>
+                {" "}
+                <BranchLine section={student.section} inline />
+              </>
+            )}
           </span>
         </p>
         <p className="flex flex-wrap justify-between gap-x-6">
@@ -424,8 +454,7 @@ function Certificate({
 }) {
   const { settings } = useSettings();
   const { t } = useUiControl();
-  const adminLine = useAdminLine(student.school);
-  const adminPrefix = t("print.adminPrefix");
+  const branch = branchName(student.section);
   const totals = degreeTotals(student.grades);
   const status = passStatus(totals.percentage);
   const cell = "border border-slate-400 px-1.5 py-1 text-center";
@@ -459,12 +488,8 @@ function Certificate({
         title={options.title}
         showDate={options.showDate}
         dateOnLeft
-        lines={
-          <>
-            <p className="font-bold">{t("print.directorate")}</p>
-            <p className="font-bold">{adminLine || `${adminPrefix} —`}</p>
-          </>
-        }
+        directorate={<p className="font-bold">{t("print.directorate")}</p>}
+        lines={null}
       />
 
       {/* The student on the right, the school and placement on the left. */}
@@ -481,6 +506,14 @@ function Certificate({
         <span className="font-medium">{settings.academic_year || "—"}</span>
         <span className="text-slate-500">الصف</span>
         <span className="font-medium">{student.section || "—"}</span>
+        {branch && (
+          <>
+            <span />
+            <span />
+            <span className="text-slate-500">الشعبة</span>
+            <span className="font-bold">{branch}</span>
+          </>
+        )}
         {options.showMoeCode && (
           <>
             <span className="text-slate-500">كود الحكومة الالكترونية</span>

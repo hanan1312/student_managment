@@ -14,18 +14,19 @@ and code are kept and can be switched back on with one setting (`SHOW_EXTENDED_F
 `client/src/lib/features.ts`).
 
 **Home page:** after signing in the app opens on a home page: a banner with the school's logo and
-name and the welcome text, revealed word by word (the إدارة and مدينة in gold), then the user's
+name and the welcome text, revealed word by word (the إدارة and محافظة in gold), then the user's
 name, today's date and العام الدراسي; under it a card per section (**شئون الطلاب**) that opens the section. The home
 page has no section or tab bars. The text is set in
-**التحكم → الصفحة الرئيسية → نص الترحيب** (default "أهلًا وسهلًا بكم في إدارة {الإدارة} بمدينة
-{المدينة}"): {الإدارة} and {المدينة} are replaced by the signed-in user's إدارة تعليمية and مدينة from
-**المستخدمين** (a leading "إدارة" in the name isn't repeated). An account without them (e.g. admin)
+**التحكم → الصفحة الرئيسية → نص الترحيب** (default "أهلًا وسهلًا بكم في إدارة {الإدارة} بمحافظة
+{المحافظة}"): {الإدارة} and {المحافظة} are replaced by the signed-in user's إدارة تعليمية and محافظة from
+**المستخدمين** (a leading "إدارة" in the name isn't repeated). A text saved earlier with {المدينة}
+still works. An account without them (e.g. admin)
 uses the ones all schools share, if they share one. The school's logo and name in the top bar lead
 back to the home page. The students list is now at `/students`.
 
 Visible today:
 
-- **شئون الطلاب → الطلاب**, with the ribbon buttons: طالب جديد، استيراد، تصدير، طباعة، المواد، ملف الدرجات، إضافة مدرسة، المستخدمين.
+- **شئون الطلاب → الطلاب**, with the ribbon buttons: طالب جديد، استيراد، تصدير، طباعة، المواد، ملف الدرجات، إضافة مدرسة، إضافة شعبة، المستخدمين.
 - **العام الدراسي** (Academic years): one card per year; the open year's students are what شئون الطلاب shows (see §2a).
 - **الإعدادات** (Preferences). Its العام الدراسي now shows the open year (read-only).
 - **التحكم** (Control), next to الإعدادات (see §7).
@@ -39,6 +40,13 @@ TalentX Innovations". It isn't printed.
 **Printing:** printouts have no page margin, so the browser doesn't add its own header and footer
 (the page's address, title and date) to the PDF; the sheet keeps a 10 mm border of its own on
 every page.
+
+**محافظة and الإدارة التعليمية on every printout:** the top right of every printed sheet (Students
+print, ملف الدرجات table print, the app's certificate) starts with **محافظة: …** and **الإدارة
+التعليمية: …**, taken from the **signed-in user** (المستخدمين → محافظة / إدارة تعليمية). An account
+without them (e.g. admin) uses the ones all schools share, if they share one; with neither, the
+label is printed with a dotted line to fill by hand. The official forms take the same values as
+their defaults (see §5).
 
 **Moving table columns (optional):** in the app's tables (not print previews or the per-student
 degrees editor), drag a column's header onto another header to
@@ -96,17 +104,46 @@ Opened from **إضافة مدرسة** on the Students ribbon. It lists the schoo
 |---|---|
 | اسم المدرسة | Required. This is the list offered in البيانات الأساسية → المدرسة. Renaming a school renames it on every student in it |
 | العنوان | |
-| المدينة | From المستخدمين → مدينة |
+| المحافظة | From المستخدمين → محافظة (was "المدينة"; import still reads a column headed المدينة) |
 | الإدارة | From المستخدمين → إدارة تعليمية |
 | رقم التليفون | |
 
 - **تصدير** saves the list to Excel. **استيراد** reads Excel or CSV with the same columns: a school
   whose name is already listed is updated (empty cells keep what it had), any other is added.
-  المدينة and الإدارة are matched by name (ا / أ / إ spelled either way); a name that isn't in
+  المحافظة and الإدارة are matched by name (ا / أ / إ spelled either way); a name that isn't in
   المستخدمين is left empty, with a warning in the preview.
 - A school that students are in can't be deleted, and the last school can't be deleted.
-- A city or education administration used by a school can't be deleted from المستخدمين.
+- A محافظة or education administration used by a school can't be deleted from المستخدمين.
 - These are the same schools the HR screens use.
+
+### الشعب (إضافة شعبة)
+
+Opened from **إضافة شعبة** on the Students ribbon. It lists every شعبة added by users, grouped by
+stage, as editable rows: **اسم الشعبة**, **المرحلة** and **الصف** (dropdowns of the stages and of the
+stage's sections in the الهيكل), and the number of students and subjects on it.
+
+- **+ شعبة** adds a row: type the name, choose the المرحلة and the الصف it belongs to, then save.
+- Changing a row's name, المرحلة or الصف shows save / undo on that row. Moving a شعبة to another
+  الصف takes its students and subjects with it. 🗑 deletes it (its students are kept, without a
+  placement).
+- A الصف can have several شعب. In the الهيكل each one shows as the الصف's name with the شعبة's in
+  quotes. When every item under a الصف is a شعبة, the الصف is shown as its شعب:
+
+  ```
+  المرحلة الثانوية
+  ├ الصف الأول الثانوي
+  ├ الصف الثاني الثانوي "علمي"
+  └ الصف الثاني الثانوي "أدبي"
+  ```
+
+  When the الصف has other items too (e.g. the seeded البكالوريا المصرية), the الصف stays and its
+  شعب are listed under it with those items.
+- A شعبة is a place students are placed on (التسكين), so their **الصف** reads e.g.
+  `الصف الثاني الثانوي "علمي"` in the table, prints and Export.
+- **Subjects:** a new شعبة starts with its الصف's subjects and marks from **المواد**; after that each
+  شعبة has its own, changed in المواد like any other section.
+- Not allowed: two items with the same name in one الصف, a شعبة inside a شعبة, or a شعبة on a الصف
+  that students are placed on directly (move them first).
 
 ### Students table
 
@@ -308,6 +345,8 @@ section's full path, as exported), النهاية الكبرى, النهاية �
 
 On the student's **ملف الدرجات** tab, or by clicking a student's row in the Degrees Profile screen:
 
+- A student on a شعبة sees it highlighted at the top: **شعبة : "علمي"**, with the full الصف.
+
 - Each subject shows the section's **النهايات** (كبرى / صغرى, read-only) and **one degree** box
   (الدرجة), out of the كبرى mark. (The earlier separate صغرى degree is no longer entered or shown.)
 - A degree higher than the كبرى mark is shown in red and is refused on save.
@@ -411,6 +450,14 @@ form, laid out as the paper one:
 
 - Subjects are in the paper form's order. The forms' subjects were added to **المواد** and linked to
   their sections with the forms' marks (see §8). A section whose marks were already set keeps them.
+- **المحافظة / الإدارة التعليمية (header, top right):** with no text saved for the student they
+  print **محافظة <the signed-in user's محافظة>** and **إدارة <the signed-in user's إدارة>
+  التعليمية** (the إدارة of the student's school when the user has none). Before, a student whose
+  school had no الإدارة printed nothing for a ticked الإدارة التعليمية; that was fixed.
+- **الشعبة:** a student on a شعبة gets "الشعبة / <name>" on the form (beside the name on the
+  secondary form, after الصف on the prep form), and the form's title names it, e.g. "الصف الثاني
+  الثانوي (علمي)". A شعبة named علمي or أدبي on الصف الثاني الثانوي gets the علمي / أدبي form's
+  subject order.
 - **The form's texts are student data:** البيانات الأساسية → **بيانات بيان النجاح** holds المحافظة,
   المديرية, الإدارة التعليمية, القسم (الثانوي / الإعدادي), عنوان الإعدادي, العام, لتقديمه إلى,
   الرسوم (ق / ج), رقم الحوالة, بتاريخ and تحريرا في for each student. الدور is chosen in the
@@ -430,11 +477,10 @@ form, laid out as the paper one:
 
 **The app's certificate:**
 
-- **Header:** on the right, **مديرية التربية و التعليم** and **إدارة …**: the الإدارة set for the
-  student's school in **إضافة مدرسة** (shown once if its name already starts with "إدارة" or "ادارة"). Title in
-  the middle, the logo on the left. **تاريخ الطباعة** is on the left of the page, under the header.
+- **Header:** on the right, **محافظة: …**, **مديرية التربية و التعليم** and **الإدارة التعليمية: …**
+  (the signed-in user's; see Printing in §1). Title in the middle, the logo on the left. **تاريخ الطباعة** is on the left of the page, under the header.
 - **Student details:** on the right الاسم, الرقم القومى and العام الدراسي (from Preferences); on the
-  left المدرسة, المرحلة and الصف. كود الحكومة الالكترونية is hidden by default and can be turned on in
+  left المدرسة, المرحلة, الصف and, for a student on a شعبة, **الشعبة**. كود الحكومة الالكترونية is hidden by default and can be turned on in
   the preview options.
 - **Horizontal table:** one column per subject, with **المجموع** after the subjects in the total
   and before the subjects خارج المجموع (which are marked). Rows: النهاية الكبرى, النهاية الصغرى,
@@ -467,7 +513,7 @@ back, and it can be turned off under التوقيعات. A caption saved as
 |---|---|
 | المستخدمين | Users list |
 | النشاط | Activity |
-| **مدينة** | Cities: postal code, name, comment |
+| **محافظة** | Governorates (was "مدينة"): postal code, name, comment |
 | **إدارة تعليمية** | Education administrations: code, name, comment |
 
 ### New user / Edit user
@@ -476,9 +522,9 @@ Both use the same form:
 
 | Field | How it's set |
 |---|---|
-| مدينة, إدارة تعليمية | Dropdowns from the two tabs above |
+| محافظة, إدارة تعليمية | Dropdowns from the two tabs above. They also fill the welcome text and the top right of every printout |
 | الكود | Random, unique, 5 digits (can be regenerated) |
-| اسم المستخدم | Generated as `الاسم الأول_مدينة_الكود`; the first name is the first word of الاسم بالكامل, so the username changes when the name, city or code changes |
+| اسم المستخدم | Generated as `الاسم الأول_محافظة_الكود`; the first name is the first word of الاسم بالكامل, so the username changes when the name, محافظة or code changes |
 | كلمة المرور المؤقتة | Generated as `الدور_الكود` (e.g. `teacher_48213`), shown once after saving |
 
 - **Edit** can reset the password back to the temporary one.
@@ -556,7 +602,7 @@ still only on حفظ). Who can open it: admins, the master account, and users gi
 - **أزرار شريط الطلاب:** the group caption and each button. Each button also has **ظاهر / مخفي**: a
   hidden button is gone for every user. The المستخدمين button is hidden with its tab, above.
 - **نصوص الطباعة (PDF):** the certificate title, its header lines (مديرية التربية و التعليم, the word
-  before the administration's name), the default titles of the Students and Degrees prints, the
+  before the administration's name on the official forms), the default titles of the Students and Degrees prints, the
   "تاريخ الطباعة" label, and the two default signatures.
 
 ---
@@ -570,6 +616,7 @@ except the two clean-ups noted at the end of this section.
 |---|---|
 | Students | New: المدرسة, التسكين (section link, filled in from each student's old class), الديانة uses the existing field |
 | Hierarchy | Sections can nest. المرحلة الثانوية tree added once |
+| Hierarchy — شعب | New `levels.is_branch` (0/1): a level added in إضافة شعبة. Its path is its section's with the name in quotes |
 | Subjects | كبرى/صغرى, خارج المجموع and اختياري are stored per section. The old subject-wide marks were copied to each of the subject's sections |
 | Degrees | New per-student degrees table: كبرى degree, صغرى degree, and the frozen marks |
 | Users | New: code, city, education administration, "must change password". New cities and education-administrations tables. New sign-in lockout table |
@@ -639,7 +686,7 @@ Clean-ups:
 | File | Purpose |
 |---|---|
 | `server/src/db.ts` | Migrations: `migrateSubjectsColumns`, `migrateUsersColumns`, `migrateLevelsColumns`; `seedSecondaryTree` (runs once, guarded by the settings flag `seeded_secondary_tree_v1`) |
-| `server/src/routes/classes.ts` | Nested tree response (flat list with `parent_id`, `depth`, `path`, `is_leaf`); `syncStudentPositionText`; deleting a branch; drag moves (`PUT /stages/:id/position`, `PUT /levels/:id/position`) |
+| `server/src/routes/classes.ts` | Nested tree response (flat list with `parent_id`, `depth`, `path`, `is_leaf`, `is_branch`); `syncStudentPositionText`; deleting a branch; drag moves (`PUT /stages/:id/position`, `PUT /levels/:id/position`, `moveLevelTo`); الشعب (`GET`/`POST /branches`, `PUT /branches/:id`; delete is `DELETE /levels/:id`) |
 | `server/src/routes/students.ts` | Position must be a leaf; `studentGrades`; `/degrees-overview`; saving grades with frozen marks; `degreeSummary` (totals and percentage, same rule as the client); stage scope checks |
 | `server/src/routes/subjects.ts` | Per-section `levelMarks` (كبرى/صغرى, `outsideTotal`). `elective_group` is preserved. Open to the `timetable` **or** `students` permission |
 | `server/src/routes/users.ts` | Generated code, username and password; edit with optional reset; `must_change_password` |
@@ -662,21 +709,23 @@ Clean-ups:
 | `client/src/components/StudentDegreesEditor.tsx` | Shared per-student degrees editor |
 | `client/src/components/DegreesProfileModal.tsx` | Degrees Profile screen |
 | `client/src/components/StudentCertificateModal.tsx` | Certificate print preview: the official forms (`SecondaryForm`, `PrepForm`, editable `Field`s) and the app's certificate |
-| `client/src/lib/certificateForms.ts` | Which form a student gets (`certificateFormFor`), the forms' subject order and signatures |
+| `client/src/lib/certificateForms.ts` | Which form a student gets (`certificateFormFor`), the forms' subject order and signatures; `branchName` (the شعبة in a الصف text) |
 | `client/src/pages/AcademicYearsPage.tsx` | العام الدراسي cards |
 | `client/src/components/StudentsTable.tsx` | Students table; 50-per-page paging (`PAGE_SIZE`), reset by the page's `pageResetKey` |
 | `client/src/components/StudentsPrintModal.tsx` | Students print preview (divisions, columns, layout); print CSS in `index.css` (`.print-modal-root`, `.print-sheet`) |
 | `client/src/lib/degrees.ts` | `degreeTotals` (outside-total and choose-one rules, percentage), `passStatus` (ناجح / راسب), `autoMaxFromMin` (×2 rule for marks), print helper |
-| `client/src/components/PrintParts.tsx` | Shared print-preview pieces (modal, logo/date header, layout options, column and row controls, signatures and the draggable `StampBox`) used by the Students print, the Degrees table print and certificates |
+| `client/src/components/PrintParts.tsx` | Shared print-preview pieces (modal, logo/date header with `UserPlaceLines`, layout options, column and row controls, signatures and the draggable `StampBox`) used by the Students print, the Degrees table print and certificates |
 | `client/src/components/DegreesTablePrintModal.tsx` | ملف الدرجات → طباعة الكل |
 | `client/src/lib/uiControl.ts` | التحكم configuration: `useUiControl()` (`t(key)` texts, `tabLabel`, `isTabVisible`), `TEXTS` (every editable text and its default), `buildTabs`, `orderWithChildren` |
 | `client/src/pages/ControlPage.tsx`, `CustomTabPage.tsx`, `components/HiddenTab.tsx` | التحكم screen; an added tab's page (`/custom/:key`); redirect away from a hidden tab |
 | `client/src/lib/studentAge.ts` | Age on 1 October |
 | `client/src/lib/useColumnOrder.ts` | Drag-to-reorder table columns (`useColumnOrder`, `orderedCells`); saved in `localStorage` as `column_order:<table>`; drag styles in `index.css` |
 | `client/src/components/ClassTree.tsx` | Nested tree; drag mode (`ArrangeContext`, `useArrangeRow`) |
-| `client/src/context/ClassesContext.tsx` | Selection by `levelId`, `levelAndDescendants`, `positionOptions` |
+| `client/src/context/ClassesContext.tsx` | Selection by `levelId`, `levelAndDescendants`, `positionOptions`; شعبة labels and the الصف-shown-as-its-شعب rule (`levelLabel`, `visibleChildren`) |
+| `client/src/components/BranchesModal.tsx` | إضافة شعبة |
+| `client/src/lib/userPlace.ts` | `useUserPlace()`: the signed-in user's محافظة and إدارة تعليمية (home page, print headers, official forms) |
 | `client/src/components/timetable/SubjectSetupModal.tsx` | Per-section marks, خارج, اختياري badge |
-| `client/src/pages/UsersPage.tsx`, `SystemUserModal.tsx`, `UserCatalogTab.tsx` | Users, credential generation, city and administration tabs |
+| `client/src/pages/UsersPage.tsx`, `SystemUserModal.tsx`, `UserCatalogTab.tsx` | Users, credential generation, محافظة and administration tabs (the data keeps its `cities` / `city_id` names) |
 | `client/src/pages/LoginPage.tsx`, `LoginChangePasswordModal.tsx` | Lockout display, first-login change |
 
 **Right-to-left:** `client/index.html` sets `lang="ar" dir="rtl"`. Directional Tailwind classes

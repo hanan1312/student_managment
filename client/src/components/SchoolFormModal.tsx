@@ -12,23 +12,23 @@ import ImportExportButtons from "./ImportExportButtons";
 import { inputCls } from "./FormLayout";
 import { useColumnOrder, orderedCells } from "../lib/useColumnOrder";
 
-// Students > إضافة مدرسة. المدينة and الإدارة come from the Users catalogs; the school's name is
+// Students > إضافة مدرسة. المحافظة and الإدارة come from the Users catalogs; the school's name is
 // what students pick in البيانات الأساسية → المدرسة, and renaming it renames it on them too.
 const COLUMN_LABELS = {
   name: "اسم المدرسة",
   address: "العنوان",
-  city: "المدينة",
+  city: "المحافظة",
   education_admin: "الإدارة",
   phone: "رقم التليفون",
 };
 const COLUMN_KEYS = Object.keys(COLUMN_LABELS) as (keyof typeof COLUMN_LABELS)[];
 
 // Import / Export use the table's columns. An imported school whose name is already listed updates
-// it (empty cells keep what it had); any other is added. المدينة / الإدارة are matched by name.
+// it (empty cells keep what it had); any other is added. المحافظة / الإدارة are matched by name.
 const IMPORT_COLUMNS: ImportColumn[] = [
   { key: "name", label: COLUMN_LABELS.name, required: true, example: "مدرسة النصر", aliases: ["المدرسة", "School"] },
   { key: "address", label: COLUMN_LABELS.address, aliases: ["Address"] },
-  { key: "city", label: COLUMN_LABELS.city, aliases: ["City"] },
+  { key: "city", label: COLUMN_LABELS.city, aliases: ["المدينة", "مدينة", "محافظة", "City"] },
   { key: "education_admin", label: COLUMN_LABELS.education_admin, aliases: ["إدارة تعليمية", "ادارة"] },
   { key: "phone", label: COLUMN_LABELS.phone, aliases: ["التليفون", "الهاتف", "Phone"] },
 ];
@@ -132,7 +132,7 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
       if (!found) warnings.push(`${what} "${value.trim()}" غير موجودة في المستخدمين`);
       return found?.id;
     };
-    const cityId = lookup(cities, raw.city, "المدينة");
+    const cityId = lookup(cities, raw.city, "المحافظة");
     const educationAdminId = lookup(eduAdmins, raw.education_admin, "الإدارة");
     const existing = schools.find((s) => sameName(s.name, raw.name));
     const text = (v: string | undefined) => (v?.trim() ? v.trim() : undefined);
@@ -178,7 +178,7 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
                 <input value={form.address} onChange={(e) => set("address", e.target.value)} className={inputCls} />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-500">المدينة</span>
+                <span className="mb-1 block text-xs font-medium text-slate-500">المحافظة</span>
                 <select
                   value={form.cityId}
                   onChange={(e) => set("cityId", e.target.value ? Number(e.target.value) : "")}
@@ -292,7 +292,7 @@ export default function SchoolFormModal({ onClose }: { onClose: () => void }) {
         createPortal(
           <CsvImportModal<SchoolImport>
             title="استيراد المدارس"
-            description="المدرسة الموجودة بنفس الاسم تُحدَّث (الخانات الفارغة لا تغيّر بياناتها)، وغيرها تُضاف. المدينة والإدارة تُختاران بالاسم من المستخدمين."
+            description="المدرسة الموجودة بنفس الاسم تُحدَّث (الخانات الفارغة لا تغيّر بياناتها)، وغيرها تُضاف. المحافظة والإدارة تُختاران بالاسم من المستخدمين."
             templateFilename="schools-template.csv"
             columns={IMPORT_COLUMNS}
             mapRow={mapImportRow}

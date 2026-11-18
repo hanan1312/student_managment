@@ -34,6 +34,8 @@ type ClassesContextValue = {
   moveLevel: (levelId: number, stageId: number, parentId: number | null, beforeId: number | null) => Promise<void>;
   renameClass: (classId: number, name: string) => Promise<void>;
   deleteClass: (classId: number) => Promise<void>;
+  // Puts a tree the server sent back (e.g. after إضافة شعبة) in place.
+  replaceTree: (tree: ClassStage[]) => void;
 };
 
 const ClassesContext = createContext<ClassesContextValue | null>(null);
@@ -43,6 +45,25 @@ export function levelAndDescendants(levels: ClassLevel[], levelId: number): Clas
   const out = levels.filter((l) => l.id === levelId);
   for (let i = 0; i < out.length; i++) out.push(...levels.filter((l) => l.parent_id === out[i].id));
   return out;
+}
+
+// The name shown for a level in the tree: a شعبة reads as its section's name with its own in
+// quotes, e.g. الصف الثاني الثانوي "علمي".
+export function levelLabel(levels: ClassLevel[], level: ClassLevel): string {
+  if (!level.is_branch) return level.level;
+  const parent = levels.find((l) => l.id === level.parent_id);
+  return parent ? `${parent.level} "${level.level}"` : level.level;
+}
+
+// The items shown under parentId in the tree. A section whose sub-items are all شعب is shown as
+// its شعب instead (الصف الثاني الثانوي "علمي", الصف الثاني الثانوي "أدبي").
+export function visibleChildren(levels: ClassLevel[], parentId: number | null): ClassLevel[] {
+  return levels
+    .filter((l) => l.parent_id === parentId)
+    .flatMap((l) => {
+      const kids = levels.filter((c) => c.parent_id === l.id);
+      return kids.length > 0 && kids.every((c) => c.is_branch) ? kids : [l];
+    });
 }
 
 // Every place a student can be placed: the leaves, labelled with their full path.
@@ -207,6 +228,7 @@ export function ClassesProvider({ children }: { children: ReactNode }) {
       moveLevel,
       renameClass,
       deleteClass,
+      replaceTree: setTree,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tree, loading, selection, selectedClassIds, selectedLevelIds, selectedClassId, selectedClassName, token]

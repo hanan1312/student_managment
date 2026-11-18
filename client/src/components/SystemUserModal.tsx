@@ -78,7 +78,7 @@ export default function SystemUserModal({ initial, onClose, onSubmit }: Props) {
       return;
     }
     if (!keepsLegacyUsername && (cityId === "" || eduAdminId === "")) {
-      setError("اختر المدينة والإدارة التعليمية.");
+      setError("اختر المحافظة والإدارة التعليمية.");
       return;
     }
     setSubmitting(true);
@@ -124,7 +124,7 @@ export default function SystemUserModal({ initial, onClose, onSubmit }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">مدينة</label>
+              <label className="mb-1 block text-xs font-medium text-slate-500">محافظة</label>
               <select
                 value={cityId}
                 onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : "")}
@@ -155,7 +155,7 @@ export default function SystemUserModal({ initial, onClose, onSubmit }: Props) {
             </div>
           </div>
           {(cities.length === 0 || eduAdmins.length === 0) && (
-            <p className="text-[11px] text-amber-600">أضف بيانات في تبويبي مدينة وإدارة تعليمية أولًا.</p>
+            <p className="text-[11px] text-amber-600">أضف بيانات في تبويبي محافظة وإدارة تعليمية أولًا.</p>
           )}
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">الكود</label>
@@ -176,11 +176,11 @@ export default function SystemUserModal({ initial, onClose, onSubmit }: Props) {
             <input
               value={keepsLegacyUsername ? initial?.username ?? "" : generatedUsername}
               disabled
-              placeholder="الاسم الأول_مدينة_الكود"
+              placeholder="الاسم الأول_محافظة_الكود"
               className={fieldCls}
             />
             {keepsLegacyUsername && (
-              <p className="mt-1 text-[11px] text-slate-400">اختر المدينة والإدارة للتحويل إلى اسم مستخدم مُولّد.</p>
+              <p className="mt-1 text-[11px] text-slate-400">اختر المحافظة والإدارة للتحويل إلى اسم مستخدم مُولّد.</p>
             )}
           </div>
           <div>

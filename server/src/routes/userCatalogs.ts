@@ -3,7 +3,7 @@ import { db } from "../db";
 import { requireAuth } from "../auth";
 import { requireModule } from "../permissions";
 
-// Users > مدينة (cities: postal code, name, comment) and Users > إدارة تعليمية (education
+// Users > محافظة (cities: postal code, name, comment) and Users > إدارة تعليمية (education
 // administrations: code, name, comment). Same shape, so one generic CRUD per table; the first
 // column is the only thing that differs.
 // Reading is also open to the students module, for the school form's dropdowns.

@@ -18,7 +18,7 @@ db.exec(`
     role TEXT NOT NULL DEFAULT 'admin'
   );
 
-  -- Users > مدينة and Users > إدارة تعليمية catalogs; a user's auto-generated username is
+  -- Users > محافظة and Users > إدارة تعليمية catalogs; a user's auto-generated username is
   -- "<city>_<education admin>_<code>" (see routes/users.ts).
   CREATE TABLE IF NOT EXISTS cities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -734,7 +734,7 @@ function migrateUsersColumns() {
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_code_unique ON users(code)");
 }
 
-// Students > إضافة مدرسة links a school to the Users catalogs (مدينة, إدارة تعليمية).
+// Students > إضافة مدرسة links a school to the Users catalogs (محافظة, إدارة تعليمية).
 function migrateSchoolsColumns() {
   const cols = (db.prepare("PRAGMA table_info(schools)").all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes("city_id")) db.exec("ALTER TABLE schools ADD COLUMN city_id INTEGER REFERENCES cities(id)");
@@ -748,6 +748,9 @@ function migrateSchoolsColumns() {
 function migrateLevelsColumns() {
   const cols = (db.prepare("PRAGMA table_info(levels)").all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes("parent_id")) db.exec("ALTER TABLE levels ADD COLUMN parent_id INTEGER REFERENCES levels(id)");
+  // A شعبة added in Students > إضافة شعبة: a level under a section, shown as e.g.
+  // الصف الثاني الثانوي "علمي" (routes/classes.ts).
+  if (!cols.includes("is_branch")) db.exec("ALTER TABLE levels ADD COLUMN is_branch INTEGER NOT NULL DEFAULT 0");
 }
 
 // The Egyptian secondary tree (البكالوريا المصرية / الثانوية العامة نظام جديد, per the Ministry's

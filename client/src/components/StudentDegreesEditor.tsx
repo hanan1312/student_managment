@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { degreeTotals, formatDegree, formatPercentage, passStatus, roundDegree, statusBadgeClass } from "../lib/degrees";
 import type { StudentGrade } from "../lib/types";
-import { EXAM_ROUNDS, parseFormFields, studentRound } from "../lib/certificateForms";
+import { branchName, EXAM_ROUNDS, parseFormFields, studentRound } from "../lib/certificateForms";
 import { inputCls } from "./FormLayout";
 import StudentCertificateModal, { type CertificateStudent } from "./StudentCertificateModal";
 
@@ -95,9 +95,18 @@ export default function StudentDegreesEditor({
   };
 
   const cellCls = "px-4 py-2 text-center text-slate-600";
+  // The student's شعبة (Students > إضافة شعبة), from their الصف, e.g. الصف الثاني الثانوي "علمي".
+  const branch = branchName(student.section);
 
   return (
     <div className="space-y-4">
+      {branch && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm shadow-sm">
+          <span className="font-medium text-slate-600">شعبة :</span>
+          <span className="rounded-lg bg-gold-400/90 px-2.5 py-0.5 font-bold text-ink-950">"{branch}"</span>
+          <span className="truncate text-xs text-slate-400">{student.section}</span>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <span className="text-xs font-medium text-slate-500">الدور</span>
         <div className="flex h-[34px] w-56 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">

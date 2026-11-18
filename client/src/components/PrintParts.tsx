@@ -6,6 +6,7 @@ import { assetUrl } from "../lib/api";
 import { printOnlyTarget } from "../lib/degrees";
 import { isAdministrationManager, setStamp, useStamp, type Signatures } from "../lib/print";
 import { useUiControl } from "../lib/uiControl";
+import { useUserPlace } from "../lib/userPlace";
 
 // Shared pieces of the print previews (Students list, Degrees table, degrees certificates):
 // a full-screen modal with an options panel beside an A4 preview sheet. Only the sheet prints
@@ -84,11 +85,30 @@ export function PrintModalShell({
   );
 }
 
-// Logo, school name and academic year, the sheet title, and the date and time of printing.
+// The education administration's name without a leading "إدارة" (the label already says it).
+const adminName = (name: string) => name.trim().replace(/^[اإأ]دار[ةه]\s+/, "");
+
+// محافظة and الإدارة التعليمية of the signed-in user (المستخدمين), at the top right of every
+// printout. With no value the label is printed with a line to fill by hand.
+export function UserPlaceLines({ between }: { between?: ReactNode }) {
+  const { governorate, admin } = useUserPlace();
+  const blank = <span className="inline-block min-w-[8em] border-b border-dotted border-slate-500" />;
+  return (
+    <>
+      <p className="font-bold">محافظة: {governorate || blank}</p>
+      {between}
+      <p className="font-bold">الإدارة التعليمية: {admin ? adminName(admin) : blank}</p>
+    </>
+  );
+}
+
+// محافظة and الإدارة التعليمية (the signed-in user's), the school name and academic year, the sheet
+// title, the logo, and the date and time of printing.
 export function PrintSheetHeader({
   title,
   subtitle,
   schoolName,
+  directorate,
   lines,
   meta,
   showDate = true,
@@ -98,7 +118,9 @@ export function PrintSheetHeader({
   subtitle?: string;
   // Defaults to the school name from Preferences.
   schoolName?: string | null;
-  // Replaces the school name and academic year at the right of the header.
+  // A line between محافظة and الإدارة التعليمية (e.g. مديرية التربية و التعليم).
+  directorate?: ReactNode;
+  // Replaces the school name and academic year under them (null: nothing).
   lines?: ReactNode;
   // Shown at the end of the date line, e.g. a count of students.
   meta?: ReactNode;
@@ -114,7 +136,10 @@ export function PrintSheetHeader({
     <>
       <header className="mb-3 flex items-center justify-between gap-4 border-b-2 border-slate-700 pb-2">
         <div className="min-w-0 flex-1 space-y-0.5 text-[1.1em]">
-          {lines ?? (
+          <UserPlaceLines between={directorate} />
+          {lines !== undefined ? (
+            lines
+          ) : (
             <>
               <p className="font-bold">{schoolName || settings.school_name || "SchoolSuite"}</p>
               {settings.academic_year && <p>العام الدراسي {settings.academic_year}</p>}
